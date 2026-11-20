@@ -17,7 +17,7 @@ from .downloadutils import DownloadUtils as DU
 from . import utils, timing, plex_functions as PF
 from . import json_rpc as js, playlist_func as PL
 from . import backgroundthread, app, variables as v
-from . import exceptions
+from . import exceptions, art_sizes
 from . import upnext
 
 LOG = getLogger('PLEX.kodimonitor')
@@ -55,6 +55,8 @@ class KodiMonitor(xbmc.Monitor):
         Monitor the PKC settings for changes made by the user
         """
         LOG.debug('PKC settings change detected')
+        # the sync thread writes changed artwork sizes to the library
+        art_sizes.reset()
 
     def onNotification(self, sender, method, data):
         """
