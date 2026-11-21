@@ -91,9 +91,14 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
         ]
         for t in metadata_threads:
             t.start()
+        def stop_feeding():
+            scanner_thread.cancel()
+            for t in metadata_threads:
+                t.cancel()
         process_thread = ProcessMetadataThread(self.current_time,
                                                processing_queue,
-                                               self.update_progressbar)
+                                               self.update_progressbar,
+                                               on_failure=stop_feeding)
         process_thread.start()
         LOG.debug('Waiting for scanner thread to finish up')
         scanner_thread.join()
@@ -102,7 +107,7 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
             t.join()
         LOG.debug('Download metadata threads finished')
         process_thread.join()
-        self.successful = process_thread.successful
+        self.successful = process_thread.successful and scanner_thread.successful
         LOG.debug('threads finished work. successful: %s', self.successful)
 
     @utils.log_time

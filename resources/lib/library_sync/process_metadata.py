@@ -15,8 +15,11 @@ class ProcessMetadataThread(common.LibrarySyncMixin,
     """
     Invoke once in order to process the received PMS metadata xmls
     """
-    def __init__(self, current_time, processing_queue, update_progressbar):
+    def __init__(self, current_time, processing_queue, update_progressbar,
+                 on_failure=None):
         self.current_time = current_time
+        # Called if this thread fails, to stop the threads that feed it
+        self.on_failure = on_failure
         self.processing_queue = processing_queue
         self.update_progressbar = update_progressbar
         self.last_section = sections.Section()
@@ -50,13 +53,34 @@ class ProcessMetadataThread(common.LibrarySyncMixin,
             self.successful = False
 
     def _get(self):
-        item = {'xml': None}
-        while item and item['xml'] is None:
-            item = self.processing_queue.get()
+        """
+        The next item with an xml, or None for the sentinel or if we need to
+        stop
+        """
+        while True:
+            item = common.queue_get(self, self.processing_queue)
+            if item is None:
+                return None
             self.processing_queue.task_done()
-        return item
+            if item['xml'] is not None:
+                return item
+            # A skipped item: the section is not synced completely
+            item['section'].sync_successful = False
 
     def _run(self):
+        try:
+            self._process()
+        except Exception:
+            LOG.exception('Could not process the metadata, stopping the sync')
+            self.successful = False
+            if self.last_section:
+                self.last_section.sync_successful = False
+            if self.on_failure:
+                self.on_failure()
+        else:
+            self.finish_last_section()
+
+    def _process(self):
         # There are 2 sentinels: None for aborting/ending this thread, the dict
         # {'section': section, 'xml': None} for skipped/invalid items
         item = self._get()
@@ -88,4 +112,3 @@ class ProcessMetadataThread(common.LibrarySyncMixin,
                         processed = 0
                         context.commit()
                     item = self._get()
-        self.finish_last_section()

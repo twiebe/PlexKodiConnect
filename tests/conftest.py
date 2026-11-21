@@ -174,5 +174,23 @@ def dbs(monkeypatch):
     shutil.rmtree(folder, ignore_errors=True)
 
 
+@pytest.fixture
+def pkc(dbs):
+    """PKC's state as the service sets it up, syncing the section of the
+    tests.plex PMS"""
+    from resources.lib import app
+    app.init()
+    app.SYNC.section_ids = {1}
+    yield app
+    # Let threads a test left hanging go
+    app.APP.stop_pkc = True
+
+
 def pytest_sessionfinish(session, exitstatus):
     shutil.rmtree(KODI_HOME, ignore_errors=True)
+
+
+def pytest_configure(config):
+    # PKC's own warnings (utcnow, LOG.warn, regex escapes) are not the tests'
+    for category in ('DeprecationWarning', 'SyntaxWarning'):
+        config.addinivalue_line('filterwarnings', 'ignore::%s' % category)

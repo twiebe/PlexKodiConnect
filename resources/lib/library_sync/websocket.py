@@ -76,20 +76,26 @@ def process_websocket_messages():
     update_kodi_video_library, update_kodi_music_library = False, False
     delete_list = []
     for i, message in enumerate(WEBSOCKET_MESSAGES):
-        if message['state'] == 9:
-            successful, video, music = process_delete_message(message)
-        elif now - message['timestamp'] < app.SYNC.backgroundsync_saftymargin:
+        if (message['state'] != 9 and
+                now - message['timestamp'] < app.SYNC.backgroundsync_saftymargin):
             # We haven't waited long enough for the PMS to finish processing the
             # item. Do it later (excepting deletions)
             continue
-        else:
-            successful, video, music = process_new_item_message(message)
-            if successful:
-                task = ProcessMetadataTask()
-                task.setup(message['plex_id'],
-                           message['plex_type'],
-                           refresh=False)
-                backgroundthread.BGThreader.addTask(task)
+        try:
+            if message['state'] == 9:
+                successful, video, music = process_delete_message(message)
+            else:
+                successful, video, music = process_new_item_message(message)
+        except Exception:
+            # One item the PMS told us about must not stop the sync for good
+            LOG.exception('Could not process message %s', message)
+            successful, video, music = False, False, False
+        if successful and message['state'] != 9:
+            task = ProcessMetadataTask()
+            task.setup(message['plex_id'],
+                       message['plex_type'],
+                       refresh=False)
+            backgroundthread.BGThreader.addTask(task)
         if successful is True:
             delete_list.append(i)
             update_kodi_video_library = True if video else update_kodi_video_library
