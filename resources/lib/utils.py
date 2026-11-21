@@ -566,25 +566,28 @@ def log_xml(xml, logger, loglevel):
         logger('\n' + string)
 
 
+def _version_numbers(version):
+    """(major, minor, patch) of VERSION like "3.12.6" or "1:3.12.6-1" """
+    match = re.match(r'^(?:\d+:)?(\d+)\.(\d+)\.(\d+)(?:[-+~].*)?$', version)
+    if not match:
+        raise ValueError('Not a version: %s' % version)
+    return tuple(int(x) for x in match.groups())
+
+
 def compare_version(current, minimum):
     """
     Returns True if current is >= then minimum. False otherwise. Returns True
     if there was no valid input for current!
 
-    Input strings: e.g. "1.2.3"; always with Major, Minor and Patch!
+    Input strings: e.g. "1.2.3"; always with Major, Minor and Patch! The
+    epoch and revision of a fork's version ("1:1.2.3-4") are left out
     """
     try:
-        curr_major, curr_minor, curr_patch = current.split(".")
+        curr_major, curr_minor, curr_patch = _version_numbers(current)
     except ValueError:
         # there WAS no current DB, e.g. deleted.
         return True
-    min_major, min_minor, min_patch = minimum.split(".")
-    curr_major = int(curr_major)
-    curr_minor = int(curr_minor)
-    curr_patch = int(curr_patch)
-    min_major = int(min_major)
-    min_minor = int(min_minor)
-    min_patch = int(min_patch)
+    min_major, min_minor, min_patch = _version_numbers(minimum)
 
     if curr_major > min_major:
         return True
