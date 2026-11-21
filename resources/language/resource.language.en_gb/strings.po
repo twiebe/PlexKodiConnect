@@ -1778,7 +1778,7 @@ msgid "Client certificate file PKC sends to the PMS. Only needed if your server 
 msgstr ""
 
 msgctxt "#31209"
-msgid "Only shown on Kodi 17. PKC ignores it and always checks the certificate of the PMS."
+msgid "Check the certificate of the PMS on HTTPS connections. Set when you pick the server: on for a remote one, off for one in your network, whose certificate does not name its IP address."
 msgstr ""
 
 msgctxt "#31210"
@@ -1862,7 +1862,7 @@ msgid "Keep the progress dialog open while a full sync updates the watched state
 msgstr ""
 
 msgctxt "#31230"
-msgid "Check during sync that Kodi can reach each media file and warn if not. Turn off to speed up syncs over a slow network."
+msgid "With direct paths, check during a sync that Kodi can reach the media files of each library, and ask whether to stop the sync if not. Turn off if the files are only reachable at times."
 msgstr ""
 
 msgctxt "#31231"
@@ -1923,14 +1923,6 @@ msgstr ""
 
 msgctxt "#31245"
 msgid "Enter user name and password for the network shares that hold your media, so that Kodi can open the files directly."
-msgstr ""
-
-msgctxt "#31246"
-msgid "Stream music from the PMS instead of opening the files directly."
-msgstr ""
-
-msgctxt "#31247"
-msgid "Also sync TV shows that have no episodes."
 msgstr ""
 
 msgctxt "#31248"
@@ -2041,14 +2033,6 @@ msgctxt "#31274"
 msgid "Plex starts playback with the subtitles set on the PMS. Kodi uses its own subtitle settings."
 msgstr ""
 
-msgctxt "#31275"
-msgid "Leave specials (season 0) out of the next episodes list."
-msgstr ""
-
-msgctxt "#31276"
-msgid "Seconds to jump back when resuming a video."
-msgstr ""
-
 msgctxt "#31277"
 msgid "How PKC plays add-on paths. Try Direct Path opens the file itself if Kodi can reach it, else plays it from the PMS. Use Direct Stream or Force Transcode if playback stutters or fails."
 msgstr ""
@@ -2101,18 +2085,6 @@ msgctxt "#31289"
 msgid "If a trailer has several versions, play the first one instead of asking which one."
 msgstr ""
 
-msgctxt "#31290"
-msgid "Offer to delete an item from the PMS after it has been played."
-msgstr ""
-
-msgctxt "#31291"
-msgid "Offer it after episodes."
-msgstr ""
-
-msgctxt "#31292"
-msgid "Offer it after movies."
-msgstr ""
-
 msgctxt "#31293"
 msgid "Delete items from the PMS through the PKC context menu without a confirmation. The files are gone for good."
 msgstr ""
@@ -2135,10 +2107,6 @@ msgstr ""
 
 msgctxt "#31298"
 msgid "Start the lookup for missing artwork now instead of waiting for the next sync."
-msgstr ""
-
-msgctxt "#31299"
-msgid "Show notifications about the progress of artwork caching."
 msgstr ""
 
 msgctxt "#31300"

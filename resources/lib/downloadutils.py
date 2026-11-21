@@ -147,7 +147,7 @@ class DownloadUtils(object):
                 headerOptions = self.getHeader(options=headerOptions)
             else:
                 headerOptions = headerOverride
-            kwargs['verify'] = app.CONN.verify_ssl_cert
+            # plex.tv and the like: requests checks their certificates
             if app.CONN.ssl_cert_path:
                 kwargs['cert'] = app.CONN.ssl_cert_path
 

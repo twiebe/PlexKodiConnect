@@ -21,7 +21,6 @@ sys.path.append(__BASE__)
 import tmdbscraper.tmdb as tmdb
 
 logger = logging.getLogger('PLEX.metadata_movies')
-PREFER_KODI_COLLECTION_ART = utils.settings('PreferKodiCollectionArt') == 'false'
 
 TMDB_SETTINGS = xbmcaddon.Addon(id='metadata.themoviedb.org.python')
 TMDB_MOVIESCRAPER_API = inspect.signature(tmdb.TMDBMovieScraper).parameters
@@ -157,7 +156,8 @@ def process_fanart(plex_id, plex_type, refresh=False):
                 with KodiVideoDB() as kodidb:
                     setid = kodidb.create_collection(setname)
                 external_set_artwork = api.set_artwork()
-                if external_set_artwork and PREFER_KODI_COLLECTION_ART:
+                if (external_set_artwork and
+                        utils.settings('PreferKodiCollectionArt') == 'true'):
                     kodi_artwork = api.artwork(kodi_id=setid,
                                                kodi_type=v.KODI_TYPE_SET)
                     for art in kodi_artwork:

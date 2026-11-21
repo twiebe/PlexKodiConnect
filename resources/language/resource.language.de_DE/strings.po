@@ -1762,8 +1762,8 @@ msgid "Client certificate file PKC sends to the PMS. Only needed if your server 
 msgstr "Client-Zertifikatsdatei, die PKC an den PMS schickt. Nur nötig, wenn Ihr Server oder ein vorgeschalteter Proxy eine verlangt."
 
 msgctxt "#31209"
-msgid "Only shown on Kodi 17. PKC ignores it and always checks the certificate of the PMS."
-msgstr "Wird nur unter Kodi 17 angezeigt. PKC ignoriert die Einstellung und prüft das Zertifikat des PMS immer."
+msgid "Check the certificate of the PMS on HTTPS connections. Set when you pick the server: on for a remote one, off for one in your network, whose certificate does not name its IP address."
+msgstr "Prüft bei HTTPS-Verbindungen das Zertifikat des PMS. Wird bei der Wahl des Servers gesetzt: an für einen entfernten Server, aus für einen im eigenen Netzwerk, dessen Zertifikat nicht auf seine IP-Adresse lautet."
 
 msgctxt "#31210"
 msgid "Show a notification when the PMS goes offline and when it is back."
@@ -1846,8 +1846,8 @@ msgid "Keep the progress dialog open while a full sync updates the watched state
 msgstr "Den Fortschrittsdialog offen lassen, während eine vollständige Synchronisation Gesehen-Status und Bewertungen aller Einträge abgleicht."
 
 msgctxt "#31230"
-msgid "Check during sync that Kodi can reach each media file and warn if not. Turn off to speed up syncs over a slow network."
-msgstr "Bei der Synchronisation prüfen, ob Kodi jede Mediendatei erreicht, und sonst warnen. Ausschalten, um Synchronisationen über ein langsames Netzwerk zu beschleunigen."
+msgid "With direct paths, check during a sync that Kodi can reach the media files of each library, and ask whether to stop the sync if not. Turn off if the files are only reachable at times."
+msgstr "Prüft bei direkten Pfaden während der Synchronisation, ob Kodi die Mediendateien jeder Bibliothek erreicht, und fragt sonst, ob die Synchronisation stoppen soll. Ausschalten, wenn die Dateien nur zeitweise erreichbar sind."
 
 msgctxt "#31231"
 msgid "How many downloads from the PMS run at once during a sync. Lower it if the PMS or a small device struggles."
@@ -1908,14 +1908,6 @@ msgstr "Bei Addon startet PKC die Wiedergabe über den PMS. Bei Direct Paths öf
 msgctxt "#31245"
 msgid "Enter user name and password for the network shares that hold your media, so that Kodi can open the files directly."
 msgstr "Benutzername und Passwort für die Netzwerkfreigaben mit Ihren Medien eingeben, damit Kodi die Dateien direkt öffnen kann."
-
-msgctxt "#31246"
-msgid "Stream music from the PMS instead of opening the files directly."
-msgstr "Musik vom PMS streamen, statt die Dateien direkt zu öffnen."
-
-msgctxt "#31247"
-msgid "Also sync TV shows that have no episodes."
-msgstr "Auch Serien ohne Episoden synchronisieren."
 
 msgctxt "#31248"
 msgid "Set by PKC once it has wiped the Kodi database after the first setup."
@@ -2025,14 +2017,6 @@ msgctxt "#31274"
 msgid "Plex starts playback with the subtitles set on the PMS. Kodi uses its own subtitle settings."
 msgstr "Bei Plex startet die Wiedergabe mit den auf dem PMS eingestellten Untertiteln. Kodi nutzt seine eigenen Untertiteleinstellungen."
 
-msgctxt "#31275"
-msgid "Leave specials (season 0) out of the next episodes list."
-msgstr "Specials (Staffel 0) in der Liste der nächsten Episoden auslassen."
-
-msgctxt "#31276"
-msgid "Seconds to jump back when resuming a video."
-msgstr "Sekunden, die beim Fortsetzen eines Videos zurückgesprungen wird."
-
 msgctxt "#31277"
 msgid "How PKC plays add-on paths. Try Direct Path opens the file itself if Kodi can reach it, else plays it from the PMS. Use Direct Stream or Force Transcode if playback stutters or fails."
 msgstr "Wie PKC Add-on-Pfade abspielt. Try Direct Path öffnet die Datei selbst, wenn Kodi sie erreicht, sonst spielt PKC sie vom PMS. Direct Stream oder Force Transcode nutzen, wenn die Wiedergabe ruckelt oder scheitert."
@@ -2085,18 +2069,6 @@ msgctxt "#31289"
 msgid "If a trailer has several versions, play the first one instead of asking which one."
 msgstr "Wenn ein Trailer mehrere Versionen hat, die erste abspielen, statt nachzufragen."
 
-msgctxt "#31290"
-msgid "Offer to delete an item from the PMS after it has been played."
-msgstr "Nach der Wiedergabe anbieten, den Eintrag vom PMS zu löschen."
-
-msgctxt "#31291"
-msgid "Offer it after episodes."
-msgstr "Nach Episoden anbieten."
-
-msgctxt "#31292"
-msgid "Offer it after movies."
-msgstr "Nach Filmen anbieten."
-
 msgctxt "#31293"
 msgid "Delete items from the PMS through the PKC context menu without a confirmation. The files are gone for good."
 msgstr "Einträge über das PKC-Kontextmenü ohne Rückfrage vom PMS löschen. Die Dateien sind dann endgültig weg."
@@ -2120,10 +2092,6 @@ msgstr "Sammlungsbilder, die bereits in Kodi sind, behalten und aus der Online-S
 msgctxt "#31298"
 msgid "Start the lookup for missing artwork now instead of waiting for the next sync."
 msgstr "Die Suche nach fehlenden Bildern jetzt starten, statt auf die nächste Synchronisation zu warten."
-
-msgctxt "#31299"
-msgid "Show notifications about the progress of artwork caching."
-msgstr "Benachrichtigungen zum Fortschritt des Bild-Cachings anzeigen."
 
 msgctxt "#31300"
 msgid "Keep caching artwork while a video plays. Turn off if playback stutters on a weak device. Needs a Kodi restart."
