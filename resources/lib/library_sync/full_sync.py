@@ -160,7 +160,12 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                 for xml in section.iterator:
                     section.count += 1
                     context.begin()
-                    if not context.update_userdata(xml, section.plex_type):
+                    if context.outdated(xml, section):
+                        LOG.info('Updating item the PMS did not mark as '
+                                 'updated: %s %s', xml.get('ratingKey'),
+                                 xml.get('title'))
+                        self.add_missing_item(context, xml, section)
+                    elif not context.update_userdata(xml, section.plex_type):
                         # Somehow did not sync this item yet
                         self.add_missing_item(context, xml, section)
                     # Seen on the PMS: no need to delete it
@@ -290,6 +295,11 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                         # what we did not see
                         self.successful = False
                     else:
+                        if (items == 'all' and section.plex_type in
+                                (v.PLEX_TYPE_MOVIE, v.PLEX_TYPE_SHOW)):
+                            # Changes to these do not mark items as updated
+                            section.tags = PF.tag_members(section.section_id,
+                                                          section.plex_type)
                         section.number_of_items = section.iterator.total
                         if section.number_of_items > 0:
                             section_queue.put(section)

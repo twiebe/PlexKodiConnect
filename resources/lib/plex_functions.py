@@ -641,8 +641,12 @@ def _plex_ids_on_pms(plex_ids):
                     'includeReviews': 0, 'skipRefresh': 1},
         return_response=True)
     status = getattr(response, 'status_code', None)
-    if status == 404 and len(plex_ids) == 1:
-        return set()
+    if status == 404:
+        if len(plex_ids) == 1:
+            return set()
+        # The PMS has none of them: we ask one by one to be sure
+        LOG.debug('The PMS has none of %s', plex_ids)
+        return None
     if status != 200:
         LOG.warn('Could not ask the PMS whether it still has %s: %s',
                  plex_ids, status or response)
@@ -1065,6 +1069,47 @@ def collections(section_id):
         LOG.error("Error retrieving collections for %s", url)
         xml = None
     return xml
+
+
+def tag_members(section_id, plex_type):
+    """
+    {plex_id: set of names} of the collections and labels of the items of
+    kind PLEX_TYPE in the section, or None if the PMS did not tell us all.
+    Their listing names at most two of each. Smart collections are left out:
+    the items' own metadata does not name them either
+    """
+    members = {}
+    xml = collections(section_id)
+    if xml is None:
+        return None
+    for collection in xml:
+        if collection.get('smart') == '1':
+            continue
+        children = DownloadChunks('{server}/library/collections/%s/children'
+                                  % collection.get('ratingKey'))
+        if children is None:
+            return None
+        for child in children:
+            members.setdefault(int(child.get('ratingKey')),
+                               set()).add(collection.get('title'))
+    type_number = v.PLEX_TYPE_NUMBER_FROM_PLEX_TYPE[plex_type]
+    labels = DU().downloadUrl('{server}/library/sections/%s/label' % section_id,
+                              parameters={'type': type_number})
+    try:
+        labels.attrib
+    except AttributeError:
+        LOG.error('Could not get the labels of section %s', section_id)
+        return None
+    for label in labels:
+        items = DownloadChunks(utils.extend_url(
+            '{server}/library/sections/%s/all' % section_id,
+            {'type': type_number, 'label': label.get('key')}))
+        if items is None:
+            return None
+        for item in items:
+            members.setdefault(int(item.get('ratingKey')),
+                               set()).add(label.get('title'))
+    return members
 
 
 def scrobble(ratingKey, state):

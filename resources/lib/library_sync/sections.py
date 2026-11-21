@@ -468,6 +468,9 @@ def get_sync_section(section, plex_type):
     section.number_of_items = 0
     # Iterator to get one sync item after the other
     section.iterator = None
+    # {plex_id: names of its collections and labels} for a pass over all
+    # items, None if we do not know
+    section.tags = None
     return section
 
 
