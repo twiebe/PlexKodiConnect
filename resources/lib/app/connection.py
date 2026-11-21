@@ -88,7 +88,7 @@ class Connection(object):
                   self.server_name, self.machine_identifier, self.server)
 
     def load_entrypoint(self):
-        self.verify_ssl_cert = None
+        self.verify_ssl_cert = utils.settings('sslverify') == 'true'
         self.ssl_cert_path = utils.settings('sslcert') \
             if utils.settings('sslcert') != 'None' else None
         self.https = utils.settings('https') == 'true'
