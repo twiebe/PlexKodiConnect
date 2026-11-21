@@ -14,6 +14,18 @@ if library_sync.PLAYLIST_SYNC_ENABLED:
 LOG = getLogger('PLEX.sync')
 
 
+
+def load_changed_settings():
+    """
+    Load the settings the user changed since the last sync. Not during one:
+    e.g. the paths it writes must not change halfway
+    """
+    if app.SYNC.settings_changed:
+        app.SYNC.settings_changed = False
+        LOG.info('Loading changed settings')
+        app.SYNC.load()
+
+
 class Sync(backgroundthread.KillableThread):
     """
     The one and only library sync thread. Spawn only 1!
@@ -79,6 +91,7 @@ class Sync(backgroundthread.KillableThread):
         app.APP.resume_caching_thread()
 
     def start_library_sync(self, show_dialog=None, repair=False, block=False):
+        load_changed_settings()
         app.APP.suspend_metadata_thread(block=True)
         app.APP.suspend_caching_thread(block=True)
         show_dialog = show_dialog if show_dialog is not None else app.SYNC.sync_dialog
@@ -233,6 +246,7 @@ class Sync(backgroundthread.KillableThread):
                             (utils.settings('delayBackgroundSyncWhilePlaying') == "false" or not app.APP.is_playing_video)):
                         last_websocket_processing = now
                         try:
+                            load_changed_settings()
                             library_sync.process_websocket_messages()
                         except Exception:
                             LOG.exception('Could not process the PMS messages')

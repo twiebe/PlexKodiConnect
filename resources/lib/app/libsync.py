@@ -17,6 +17,9 @@ def remove_trailing_slash(path):
 
 class Sync(object):
     def __init__(self, entrypoint=False):
+        # The user changed settings: load() them before the next sync, not
+        # in the middle of one
+        self.settings_changed = False
         # Direct Paths (True) or Addon Paths (False)?
         self.direct_paths = None
         # Is synching of Plex music enabled?

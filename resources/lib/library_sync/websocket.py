@@ -15,8 +15,6 @@ if PLAYLIST_SYNC_ENABLED:
 
 LOG = getLogger('PLEX.sync.websocket')
 
-CACHING_ENALBED = utils.settings('enableTextureCache') == "true"
-
 WEBSOCKET_MESSAGES = []
 # New items whose metadata one request asks for
 BATCH_SIZE = 20
@@ -463,7 +461,7 @@ def cache_artwork(plex_id, plex_type, kodi_id=None, kodi_type=None):
     """
     Triggers caching of artwork (if so enabled in the PKC settings)
     """
-    if not CACHING_ENALBED:
+    if utils.settings('enableTextureCache') != 'true':
         return
     if not kodi_id:
         with PlexDB(lock=False) as plexdb:
