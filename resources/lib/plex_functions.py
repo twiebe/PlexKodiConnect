@@ -641,8 +641,12 @@ def _plex_ids_on_pms(plex_ids):
                     'includeReviews': 0, 'skipRefresh': 1},
         return_response=True)
     status = getattr(response, 'status_code', None)
-    if status == 404 and len(plex_ids) == 1:
-        return set()
+    if status == 404:
+        if len(plex_ids) == 1:
+            return set()
+        # The PMS has none of them: we ask one by one to be sure
+        LOG.debug('The PMS has none of %s', plex_ids)
+        return None
     if status != 200:
         LOG.warn('Could not ask the PMS whether it still has %s: %s',
                  plex_ids, status or response)
