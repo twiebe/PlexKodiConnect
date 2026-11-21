@@ -473,7 +473,7 @@ def GetPlexMetadata(key, reraise=False):
     arguments = {
         'checkFiles': 0,
         'includeExtras': 1,         # Trailers and Extras => Extras
-        'includeReviews': 1,
+        'includeReviews': 0,        # PKC does not use them
         'includeRelated': 0,        # Similar movies => Video -> Related
         'skipRefresh': 1,
         'includeMarkers': 1,        # e.g. start + stop of intros

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 from logging import getLogger
 import queue
 import sqlite3
@@ -49,6 +50,8 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
         else:
             self.dialog = None
         self.current_time = timing.plex_now()
+        # plex_type: the plex_ids the passes over all items came across
+        self.seen = defaultdict(set)
         self.last_section = sections.Section()
         self.install_sync_done = utils.settings('SyncInstallRunDone') == 'true'
         super(FullSync, self).__init__()
@@ -147,9 +150,8 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                     if not context.update_userdata(xml, section.plex_type):
                         # Somehow did not sync this item yet
                         self.add_missing_item(context, xml, section)
-                    context.plexdb.update_last_sync(int(xml.attrib['ratingKey']),
-                                                    section.plex_type,
-                                                    self.current_time)
+                    # Seen on the PMS: no need to delete it
+                    self.seen[section.plex_type].add(int(xml.attrib['ratingKey']))
                     self.update_progressbar(section, '', section.count - 1)
                     if (section.count % PLAYSTATE_BATCH_SIZE == 0 or
                             monotonic() - last_commit > COMMIT_INTERVAL):
@@ -195,36 +197,35 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
         """
         Removes the items of plex_type that the last pass over all items did
         not come across - after asking the PMS: a listing can miss items, e.g.
-        if items are deleted while we page through it.
+        if items are deleted while we page through it. Items of sections we no
+        longer sync go without asking.
         Returns False if we could not finish
         """
-        while True:
-            with PlexDB() as plexdb:
-                plex_ids = list(plexdb.plex_id_by_last_sync(
-                    plex_type, self.current_time, DELETION_BATCH_SIZE))
-            if not plex_ids:
-                return True
-            if self.should_cancel():
-                return False
-            still_there = PF.plex_ids_on_pms(plex_ids)
-            if still_there is None:
-                LOG.error('Could not check whether the PMS still has %s '
-                          'items, not deleting them', plex_type)
-                return False
-            if still_there:
-                LOG.warn('The PMS still has these %s items we did not see: %s',
-                         plex_type, sorted(still_there))
+        with PlexDB(lock=False) as plexdb:
+            missing = [(plex_id, section_id) for plex_id, section_id
+                       in plexdb.plex_ids_and_sections(plex_type)
+                       if plex_id not in self.seen[plex_type]]
+        if not missing:
+            return True
+        to_check = [plex_id for plex_id, section_id in missing
+                    if section_id in app.SYNC.section_ids]
+        still_there = PF.plex_ids_on_pms(to_check) if to_check else set()
+        if still_there is None:
+            LOG.error('Could not check whether the PMS still has %s '
+                      'items, not deleting them', plex_type)
+            return False
+        if still_there:
+            LOG.warn('The PMS still has these %s items we did not see: %s',
+                     plex_type, sorted(still_there))
+        to_delete = [plex_id for plex_id, _ in missing
+                     if plex_id not in still_there]
+        for start in range(0, len(to_delete), DELETION_BATCH_SIZE):
             with context(self.current_time) as ctx:
-                for plex_id in plex_ids:
+                for plex_id in to_delete[start:start + DELETION_BATCH_SIZE]:
                     if self.should_cancel():
                         return False
-                    if plex_id in still_there:
-                        ctx.plexdb.update_last_sync(plex_id, plex_type,
-                                                    self.current_time)
-                    else:
-                        ctx.remove(plex_id, plex_type)
-            if len(plex_ids) < DELETION_BATCH_SIZE:
-                return True
+                    ctx.remove(plex_id, plex_type)
+        return True
 
     def threaded_get_generators(self, kinds, section_queue, items):
         """
