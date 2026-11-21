@@ -3,7 +3,7 @@ from logging import getLogger
 
 from . import common
 from ..plex_api import API
-from .. import backgroundthread, plex_functions as PF, utils, variables as v
+from .. import backgroundthread, plex_functions as PF, utils, variables as v, app
 
 LOG = getLogger('PLEX.sync.get_metadata')
 LOCK = backgroundthread.threading.Lock()
@@ -33,6 +33,8 @@ class GetMetadataThread(common.LibrarySyncMixin,
             collection_match = \
                 [(utils.cast(int, x.get('index')),
                   utils.cast(int, x.get('ratingKey'))) for x in collection_match]
+            # Once per section, not for every movie in a collection
+            item['section'].collection_match = collection_match
         item['children'] = {}
         for plex_set_id, set_name in api.collections():
             if self.should_cancel():
@@ -117,7 +119,8 @@ class GetMetadataThread(common.LibrarySyncMixin,
                 if child.tag == 'Collection':
                     collections = True
                     break
-            if collections:
+            # The collections' metadata is only used for their artwork
+            if collections and app.SYNC.artwork:
                 with LOCK:
                     self._collections(item)
         if section.get_children:

@@ -343,7 +343,7 @@ def initialize():
                 'CREATE INDEX IF NOT EXISTS ix_season_3 ON season (plex_guid)',
                 'CREATE INDEX IF NOT EXISTS ix_episode_1 ON episode (last_sync)',
                 'CREATE UNIQUE INDEX IF NOT EXISTS ix_episode_2 ON episode (kodi_id)',
-                'CREATE INDEX IF NOT EXISTS ix_episode_3 ON season (plex_guid)',
+                'CREATE INDEX IF NOT EXISTS ix_episode_3 ON episode (plex_guid)',
                 'CREATE INDEX IF NOT EXISTS ix_artist_1 ON artist (last_sync)',
                 'CREATE UNIQUE INDEX IF NOT EXISTS ix_artist_2 ON artist (kodi_id)',
                 'CREATE INDEX IF NOT EXISTS ix_album_1 ON album (last_sync)',
@@ -353,6 +353,13 @@ def initialize():
                 'CREATE UNIQUE INDEX IF NOT EXISTS ix_playlists_2 ON playlists (kodi_path)',
                 'CREATE INDEX IF NOT EXISTS ix_playlists_3 ON playlists (kodi_hash)',
             )
+            # Older PKC versions created ix_episode_3 on the season table
+            plexdb.cursor.execute('''
+                SELECT tbl_name FROM sqlite_master
+                WHERE type = 'index' AND name = 'ix_episode_3'
+            ''')
+            if plexdb.cursor.fetchone() == ('season', ):
+                plexdb.cursor.execute('DROP INDEX ix_episode_3')
             for cmd in commands:
                 plexdb.cursor.execute(cmd)
 

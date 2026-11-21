@@ -4,7 +4,7 @@ from logging import getLogger
 import requests
 import requests.exceptions as exceptions
 
-from . import utils, clientinfo, app
+from . import utils, clientinfo, app, backgroundthread
 
 ###############################################################################
 
@@ -71,9 +71,13 @@ class DownloadUtils(object):
             self.count_error = 0
             self.count_unauthorized = 0
 
-        # Retry connections to the server
-        self.s.mount("http://", requests.adapters.HTTPAdapter(max_retries=1))
-        self.s.mount("https://", requests.adapters.HTTPAdapter(max_retries=1))
+        # Retry connections to the server. Keep a connection for each thread
+        # that downloads at the same time, the sync's and the chunk workers'
+        pool = max(10, utils.cast(int, utils.settings('syncThreadNumber')) or 0) + \
+            backgroundthread.WORKER_COUNT
+        for scheme in ('http://', 'https://'):
+            self.s.mount(scheme, requests.adapters.HTTPAdapter(
+                max_retries=1, pool_maxsize=pool))
 
         LOG.debug("Requests session started on: %s", app.CONN.server)
 

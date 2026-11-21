@@ -114,3 +114,4 @@ def test_one_bad_websocket_message_does_not_stop_the_others(pkc, monkeypatch):
     assert done == [2]
     assert [m['plex_id'] for m in websocket.WEBSOCKET_MESSAGES] == [1]
     assert websocket.WEBSOCKET_MESSAGES[0]['attempt'] == 1
+
