@@ -69,6 +69,8 @@ def test_kodi_shutting_down_while_locked_raises(pkc, dbs, monkeypatch):
 def test_kodi_can_write_while_the_sync_waits_for_downloads(pkc, dbs, monkeypatch,
                                                          settings):
     pms = plex.FakePMS([plex.movie(i) for i in range(1, 6)]).install(monkeypatch)
+    # Item by item, so that movie 4 can be slow
+    pms.batch_fails = True
     release = threading.Event()
     get_metadata = pms.get_metadata
 

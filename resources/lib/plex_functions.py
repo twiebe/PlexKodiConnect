@@ -512,6 +512,43 @@ def GetPlexMetadata(key, reraise=False):
         return xml
 
 
+def plex_metadata(plex_ids):
+    """
+    The metadata of several items with one request, as GetPlexMetadata would
+    give it for each: {plex_id: etree XML}. Items the PMS did not return are
+    missing. Returns 401 if the PMS answered so, an empty dict on any other
+    error.
+    """
+    url = '{server}/library/metadata/' + ','.join(str(x) for x in plex_ids)
+    arguments = {
+        'checkFiles': 0,
+        'includeExtras': 1,
+        'includeReviews': 0,
+        'includeRelated': 0,
+        'skipRefresh': 1,
+        'includeMarkers': 1,
+    }
+    try:
+        xml = DU().downloadUrl(utils.extend_url(url, arguments))
+    except Exception:
+        LOG.exception('Could not get the metadata of %s', plex_ids)
+        return {}
+    if xml == 401:
+        return 401
+    if xml is None or not hasattr(xml, 'attrib'):
+        return {}
+    result = {}
+    for child in xml:
+        plex_id = utils.cast(int, child.get('ratingKey'))
+        if plex_id is None:
+            continue
+        single = utils.undefused_etree.Element(xml.tag, xml.attrib)
+        single.set('size', '1')
+        single.append(child)
+        result[plex_id] = single
+    return result
+
+
 def get_playback_xml(url, server_name, authenticate=True, token=None):
     """
     Returns None if something went wrong
