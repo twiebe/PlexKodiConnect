@@ -372,7 +372,7 @@ class Song(MusicMixin, ItemBase):
             # No album found, create a single's album
             LOG.info('Creating singles album')
             parent_id = self.kodidb.new_album_id()
-            self.kodidb.add_album(kodi_id,
+            self.kodidb.add_album(parent_id,
                                   None,
                                   None,
                                   None,
@@ -381,12 +381,11 @@ class Song(MusicMixin, ItemBase):
                                   # TODO: as soon as Plex supports the original
                                   # release date (Kodi: strOrigReleaseDate)
                                   api.premiere_date(),
-                                  None,
+                                  0,
                                   None,
                                   None,
                                   'single',
-                                  None,
-                                  None,
+                                  0,
                                   timing.unix_date_to_kodi(self.last_sync),
                                   'single')
         else:
