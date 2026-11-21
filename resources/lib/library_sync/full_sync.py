@@ -84,9 +84,10 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
         Copied with SQLite's backup, not as a file: in WAL mode the latest
         changes may still be in plex.db-wal, and a copy made while SQLite
         writes back to plex.db can be broken. A plex-copy.db-wal left behind
-        would be applied to the new copy.
+        would be applied to the new copy. The old copy goes first: a backup
+        into it would write every page twice, through its WAL
         """
-        for suffix in ('-wal', '-shm'):
+        for suffix in ('', '-wal', '-shm'):
             if path_ops.exists(v.DB_PLEX_COPY_PATH + suffix):
                 path_ops.remove(v.DB_PLEX_COPY_PATH + suffix)
         source = sqlite3.connect(v.DB_PLEX_PATH, timeout=db.DB_CONNECTION_TIMEOUT)
