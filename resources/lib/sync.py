@@ -224,7 +224,8 @@ class Sync(backgroundthread.KillableThread):
                     utils.settings('SyncInstallRunDone', value='true')
                     install_sync_done = True
                     initial_sync_done = True
-                    utils.settings('dbCreatedWithVersion', v.ADDON_VERSION)
+                    utils.settings('dbCreatedWithVersion',
+                                   utils.upstream_version(v.ADDON_VERSION))
                     # Reload skin in order to ensure items showing up on Kodi
                     # Homescreen
                     xbmc.executebuiltin('ReloadSkin()')

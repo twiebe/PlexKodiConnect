@@ -574,6 +574,18 @@ def _version_numbers(version):
     return tuple(int(x) for x in match.groups())
 
 
+def upstream_version(version):
+    """
+    VERSION without a fork's epoch and revision: "1:3.12.6-1" -> "3.12.6".
+    What PKC stores in its settings, so that PKC of upstream, which cannot
+    compare a fork's version, can read them after a switch back
+    """
+    try:
+        return '%s.%s.%s' % _version_numbers(version)
+    except ValueError:
+        return version
+
+
 def compare_version(current, minimum):
     """
     Returns True if current is >= then minimum. False otherwise. Returns True
