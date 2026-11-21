@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon  id="plugin.video.plexkodiconnect" name="PlexKodiConnect" version="3.12.6" provider-name="croneter">
+<addon  id="plugin.video.plexkodiconnect" name="PlexKodiConnect" version="1:3.12.6-1" provider-name="croneter">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
     <import addon="script.module.requests" version="2.22.0" />
@@ -113,7 +113,36 @@
     <summary lang="ko_KR">Plex를 Kodi에 기본 통합</summary>
     <description lang="ko_KR">Kodi를 Plex Media Server에 연결합니다. 이 플러그인은 Plex로 모든 비디오를 관리하고 Kodi로는 관리하지 않는다고 가정합니다. Kodi 비디오 및 음악 데이터베이스에 이미 저장된 데이터가 손실 될 수 있습니다 (이 플러그인이 직접 변경하므로). 자신의 책임하에 사용하십시오!</description>
     <disclaimer lang="ko_KR">자신의 책임하에 사용</disclaimer>
-    <news>version 3.12.6:
+    <news>version 1:3.12.6-1 (fork of 3.12.6 by twiebe):
+Sync you can rely on
+- A failed or slow answer of the PMS no longer hangs the sync, the other libraries sync on (upstream #2087, #1832, #1967)
+- An error in the background sync no longer stops PKC from syncing until Kodi restarts (upstream #2069)
+- Nothing is deleted from Kodi unless the PMS confirms it is gone: an incomplete answer of the PMS used to remove whole libraries
+- Short database transactions that let Kodi write in between: no more "database is locked", fewer stutters during background syncs (upstream #1929, #1471)
+- Renamed or replaced files reach Kodi with the next sync, with direct paths (upstream #1893, #2201, #1871)
+- Collections and labels reach Kodi with the next sync, without a repair (upstream #2141, #2095, #689)
+- Items removed from Kodi's library come back with the next sync
+- New shows, seasons, albums and tracks from the background sync no longer keep Kodi waiting for the PMS
+- A track without an album gets an album of its own instead of failing
+- Suspending PKC stops a running sync at once
+Faster
+- Metadata is asked for 20 items at a time: a repair sync of a large library is almost three times as fast
+- Each full sync writes only what changed instead of every item again
+- The background sync writes new items in batches
+- A collection's details are downloaded once per sync, not once per movie in it
+Fixed
+- Plex user ratings reach Kodi
+- The sync no longer deletes bookmarks you set in Kodi
+- Changed settings apply without restarting Kodi
+Settings
+- Artwork width per kind (poster, still, fanart, banner) that fits the screen, instead of 1920 px for everything
+- A short help text for every visible setting
+- "Verify access to media files" works, off unless you turn it on
+- "Prefer Kodi collection art" works the right way round
+- "Verify Host SSL Certificate" really verifies the certificate, also in plugin calls
+- Eight settings that did nothing are gone
+
+version 3.12.6:
 - version 3.11.4-3.12.5 for everyone
 
 version 3.12.5 (beta only):
