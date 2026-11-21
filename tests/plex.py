@@ -108,13 +108,24 @@ class FakePMS(object):
         self.metadata_errors = {}
         self.metadata_requests = []
         self.listing_requests = []
+        # number of the listing request (1, 2, ...): what to do with it
+        self.fail_listings = set()
+        self.hide_in_listings = {}
+        self.existence_check_fails = False
 
     def install(self, monkeypatch):
         from resources.lib import plex_functions as PF
         monkeypatch.setattr(PF, 'GetPlexMetadata', self.get_metadata)
         monkeypatch.setattr(PF, 'get_section_iterator', self.section_iterator)
         monkeypatch.setattr(PF, 'collections', lambda section_id: container())
+        monkeypatch.setattr(PF, 'plex_ids_on_pms', self.plex_ids_on_pms,
+                            raising=False)
         return self
+
+    def plex_ids_on_pms(self, plex_ids):
+        if self.existence_check_fails:
+            return None
+        return {x for x in plex_ids if x in self.movies}
 
     def get_metadata(self, key, reraise=False):
         plex_id = int(str(key).rsplit('/', 1)[-1])
@@ -128,19 +139,37 @@ class FakePMS(object):
     def section_iterator(self, section_id, plex_type=None, last_viewed_at=None,
                          updated_at=None, args=None):
         self.listing_requests.append((section_id, plex_type))
-        if self.fail_listing:
+        number = len(self.listing_requests)
+        if self.fail_listing or number in self.fail_listings:
             raise RuntimeError('Error while downloading chunks')
-        items = [self.movies[k] for k in sorted(self.movies)]
+        if plex_type not in (None, 'movie'):
+            return Listing([])
+        hidden = self.hide_in_listings.get(number, ())
+        items = [self.movies[k] for k in sorted(self.movies) if k not in hidden]
+        # The filters the PMS applies
+        if updated_at:
+            items = [x for x in items
+                     if int(x.get('updatedAt', 0)) >= updated_at]
+        if last_viewed_at:
+            # Items never watched have no lastViewedAt
+            items = [x for x in items if x.get('lastViewedAt') and
+                     int(x.get('lastViewedAt')) >= last_viewed_at]
         return Listing(listing(*items), fail_at=self.fail_listing_at)
 
 
-def movie_section():
-    """The movie section as the library sync gets it."""
+def plex_section(last_sync=0):
+    """The movie section as PKC knows it from the PMS."""
     from resources.lib.library_sync import sections
     section = sections.Section()
     section.section_id = SECTION_ID
     section.name = 'Movies'
     section.section_type = 'movie'
     section.sync_to_kodi = True
-    section.last_sync = 0
-    return sections.get_sync_section(section, 'movie')
+    section.last_sync = last_sync
+    return section
+
+
+def movie_section():
+    """The movie section as the library sync gets it."""
+    from resources.lib.library_sync import sections
+    return sections.get_sync_section(plex_section(), 'movie')

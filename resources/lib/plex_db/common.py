@@ -134,7 +134,8 @@ class PlexDBBase(object):
         Returns an iterator for all items where the last_sync is NOT identical
         """
         query = '''
-            SELECT plex_id FROM %s WHERE last_sync <> ? LIMIT %s
+            SELECT plex_id FROM %s
+            WHERE last_sync <> ? OR last_sync IS NULL LIMIT %s
         ''' % (plex_type, limit)
         return (x[0] for x in self.cursor.execute(query, (last_sync, )))
 

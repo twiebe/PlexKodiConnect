@@ -553,6 +553,60 @@ def get_playback_xml(url, server_name, authenticate=True, token=None):
             return xml
 
 
+# How many items to ask the PMS for at once whether it still has them
+EXISTENCE_BATCH_SIZE = 50
+
+
+def plex_ids_on_pms(plex_ids):
+    """
+    The ones of PLEX_IDS the PMS still has, as a set, or None if we could not
+    find out. Asks for up to EXISTENCE_BATCH_SIZE items at once.
+    """
+    found = set()
+    plex_ids = list(plex_ids)
+    for start in range(0, len(plex_ids), EXISTENCE_BATCH_SIZE):
+        batch = plex_ids[start:start + EXISTENCE_BATCH_SIZE]
+        answer = _plex_ids_on_pms(batch)
+        if answer is None and len(batch) > 1:
+            # A batch the PMS did not answer as a whole: ask one by one
+            answer = set()
+            for plex_id in batch:
+                single = _plex_ids_on_pms([plex_id])
+                if single is None:
+                    return None
+                answer |= single
+        if answer is None:
+            return None
+        found |= answer
+    return found
+
+
+def _plex_ids_on_pms(plex_ids):
+    """
+    The ones of PLEX_IDS the PMS has; None if it did not answer, or answered a
+    request for more than one item with an error
+    """
+    response = DU().downloadUrl(
+        '{server}/library/metadata/%s' % ','.join(str(x) for x in plex_ids),
+        parameters={'checkFiles': 0, 'includeExtras': 0, 'includeRelated': 0,
+                    'includeReviews': 0, 'skipRefresh': 1},
+        return_response=True)
+    status = getattr(response, 'status_code', None)
+    if status == 404 and len(plex_ids) == 1:
+        return set()
+    if status != 200:
+        LOG.warn('Could not ask the PMS whether it still has %s: %s',
+                 plex_ids, status or response)
+        return None
+    try:
+        xml = utils.etree.fromstring(response.content)
+    except utils.ParseError:
+        LOG.error('Could not parse the answer for %s', plex_ids)
+        return None
+    return {utils.cast(int, child.get('ratingKey')) for child in xml
+            if child.get('ratingKey')}
+
+
 def GetAllPlexChildren(key):
     """
     Returns a list (raw xml API dump) of all Plex children for the key.
@@ -667,7 +721,8 @@ class DownloadGen(object):
                         raise StopIteration()
             LOG.debug('Waiting for download to finish')
             if app.APP.monitor.waitForAbort(0.1):
-                raise StopIteration('PKC needs to exit now')
+                # Not StopIteration: what we got so far is not the whole list
+                raise RuntimeError('PKC needs to exit now')
 
     next = __next__
 

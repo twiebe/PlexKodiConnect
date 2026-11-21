@@ -11,6 +11,7 @@ from .process_metadata import ProcessMetadataThread
 from . import common, sections
 from .. import utils, timing, backgroundthread as bg, variables as v, app
 from .. import plex_functions as PF, itemtypes, path_ops
+from ..plex_db import PlexDB
 
 if common.PLAYLIST_SYNC_ENABLED:
     from .. import playlists
@@ -128,9 +129,7 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                     section.count += 1
                     if not context.update_userdata(xml, section.plex_type):
                         # Somehow did not sync this item yet
-                        context.add_update(xml,
-                                           section_name=section.name,
-                                           section_id=section.section_id)
+                        self.add_missing_item(context, xml, section)
                     context.plexdb.update_last_sync(int(xml.attrib['ratingKey']),
                                                     section.plex_type,
                                                     self.current_time)
@@ -140,6 +139,72 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
         except RuntimeError:
             LOG.error('Could not entirely process section %s', section)
             self.successful = False
+
+    @staticmethod
+    def add_missing_item(context, xml, section):
+        """
+        Adds an item a playstate pass came across that is not synced yet, with
+        all its metadata: the listing's xml lacks streams, cast and
+        collections, and the checksum we save means we would not get them
+        later.
+        """
+        plex_id = xml.get('ratingKey')
+        LOG.info('Adding item missing in Kodi: %s %s', plex_id, xml.get('title'))
+        metadata = PF.GetPlexMetadata(plex_id)
+        try:
+            metadata[0].attrib
+        except (TypeError, IndexError, AttributeError):
+            LOG.error('Could not get metadata for %s, adding it next time',
+                      plex_id)
+            return
+        children = None
+        if section.get_children:
+            children = PF.GetAllPlexChildren(plex_id)
+            try:
+                children[0].attrib
+            except (TypeError, IndexError, AttributeError):
+                LOG.error('Could not get the children of %s, adding it next '
+                          'time', plex_id)
+                return
+        context.add_update(metadata[0],
+                           section_name=section.name,
+                           section_id=section.section_id,
+                           children=children)
+
+    def delete_missing_items(self, plex_type, context):
+        """
+        Removes the items of plex_type that the last pass over all items did
+        not come across - after asking the PMS: a listing can miss items, e.g.
+        if items are deleted while we page through it.
+        Returns False if we could not finish
+        """
+        while True:
+            with PlexDB() as plexdb:
+                plex_ids = list(plexdb.plex_id_by_last_sync(
+                    plex_type, self.current_time, DELETION_BATCH_SIZE))
+            if not plex_ids:
+                return True
+            if self.should_cancel():
+                return False
+            still_there = PF.plex_ids_on_pms(plex_ids)
+            if still_there is None:
+                LOG.error('Could not check whether the PMS still has %s '
+                          'items, not deleting them', plex_type)
+                return False
+            if still_there:
+                LOG.warn('The PMS still has these %s items we did not see: %s',
+                         plex_type, sorted(still_there))
+            with context(self.current_time) as ctx:
+                for plex_id in plex_ids:
+                    if self.should_cancel():
+                        return False
+                    if plex_id in still_there:
+                        ctx.plexdb.update_last_sync(plex_id, plex_type,
+                                                    self.current_time)
+                    else:
+                        ctx.remove(plex_id, plex_type)
+            if len(plex_ids) < DELETION_BATCH_SIZE:
+                return True
 
     def threaded_get_generators(self, kinds, section_queue, items):
         """
@@ -183,6 +248,9 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                     except RuntimeError:
                         LOG.error('Sync at least partially unsuccessful!')
                         LOG.error('Error getting section iterator %s', section)
+                        # Without the section's items we must not delete
+                        # what we did not see
+                        self.successful = False
                     else:
                         section.number_of_items = section.iterator.total
                         if section.number_of_items > 0:
@@ -190,6 +258,7 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                             LOG.debug('Put section in queue with %s items: %s',
                                       section.number_of_items, section)
         except Exception:
+            self.successful = False
             utils.ERROR(notify=True)
         finally:
             # Sentinel for the section queue
@@ -289,18 +358,9 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
             ])
         for plex_type, context in kinds:
             # Delete movies that are not on Plex anymore
-            while True:
-                with context(self.current_time) as ctx:
-                    plex_ids = list(
-                        ctx.plexdb.plex_id_by_last_sync(plex_type,
-                                                        self.current_time,
-                                                        DELETION_BATCH_SIZE))
-                    for plex_id in plex_ids:
-                        if self.should_cancel():
-                            return
-                        ctx.remove(plex_id, plex_type)
-                if len(plex_ids) < DELETION_BATCH_SIZE:
-                    break
+            if not self.delete_missing_items(plex_type, context):
+                self.successful = False
+                return
         LOG.debug('Done looking for items to delete')
 
     @utils.log_time

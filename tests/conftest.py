@@ -180,6 +180,7 @@ def pkc(dbs):
     tests.plex PMS"""
     from resources.lib import app
     app.init()
+    app.APP.monitor = xbmc.Monitor()
     app.SYNC.section_ids = {1}
     yield app
     # Let threads a test left hanging go
