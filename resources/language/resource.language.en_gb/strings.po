@@ -1757,7 +1757,7 @@ msgstr ""
 
 # PKC Settings - Artwork size
 msgctxt "#31103"
-msgid "Backdrop width"
+msgid "Fanart width"
 msgstr ""
 
 # PKC Settings - Artwork size
@@ -1822,7 +1822,7 @@ msgstr ""
 
 # PKC Settings - Artwork size
 msgctxt "#31116"
-msgid "Largest width of backdrops the PMS sends. Auto fits the screen at the resolution of the GUI."
+msgid "Largest width of fanart, the backgrounds that fill the screen, the PMS sends. Auto fits the screen at the resolution of the GUI."
 msgstr ""
 
 # PKC Settings - Artwork size

@@ -1741,8 +1741,8 @@ msgstr "Breite von Standbildern und Landscape"
 
 # PKC Settings - Artwork size
 msgctxt "#31103"
-msgid "Backdrop width"
-msgstr "Hintergrundbreite"
+msgid "Fanart width"
+msgstr "Fanart-Breite"
 
 # PKC Settings - Artwork size
 msgctxt "#31104"
@@ -1806,8 +1806,8 @@ msgstr "Größte Breite der Episoden-Standbilder, die der PMS schickt. Auto pass
 
 # PKC Settings - Artwork size
 msgctxt "#31116"
-msgid "Largest width of backdrops the PMS sends. Auto fits the screen at the resolution of the GUI."
-msgstr "Größte Breite der Hintergrundbilder, die der PMS schickt. Auto passt zum Bildschirm in der Auflösung der Oberfläche."
+msgid "Largest width of fanart, the backgrounds that fill the screen, the PMS sends. Auto fits the screen at the resolution of the GUI."
+msgstr "Größte Breite der Fanart, der Hintergrundbilder, die den Bildschirm füllen, die der PMS schickt. Auto passt zum Bildschirm in der Auflösung der Oberfläche."
 
 # PKC Settings - Artwork size
 msgctxt "#31117"
