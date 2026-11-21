@@ -1,3 +1,7 @@
+version 1:3.12.6-2 (fork of 3.12.6 by twiebe):
+Fixed
+- Switching back to PlexKodiConnect of upstream works: with the version 1:3.12.6-1 stored in its settings, it failed to start once and then to sync on every start
+
 version 1:3.12.6-1 (fork of 3.12.6 by twiebe):
 Sync you can rely on
 - A failed or slow answer of the PMS no longer hangs the sync, the other libraries sync on (upstream #2087, #1832, #1967)
