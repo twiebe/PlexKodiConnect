@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import threading
 import time
@@ -24,6 +25,20 @@ def test_the_plex_db_copy_has_what_is_still_in_the_wal(dbs):
     keep_open.close()
     copy = sqlite3.connect(dbs['DB_PLEX_COPY_PATH'])
     assert copy.execute('SELECT plex_id FROM movie').fetchall() == [(99,)]
+
+
+def test_a_new_plex_db_copy_writes_each_page_once(dbs):
+    """A backup into last sync's copy, a WAL database, wrote every page to its
+    WAL and then again to the file: twice the writes to the eMMC every sync"""
+    full_sync.FullSync.copy_plex_db()
+    sqlite3.connect(dbs['DB_PLEX_COPY_PATH']).execute(
+        'PRAGMA journal_mode=WAL').fetchall()
+    full_sync.FullSync.copy_plex_db()
+    copy = sqlite3.connect(dbs['DB_PLEX_COPY_PATH'])
+    assert copy.execute('SELECT COUNT(*) FROM movie').fetchone() == (0,)
+    copy.close()
+    wal = dbs['DB_PLEX_COPY_PATH'] + '-wal'
+    assert not os.path.exists(wal) or os.path.getsize(wal) == 0
 
 
 class Writer(object):
