@@ -15,6 +15,24 @@ DB_CONNECTION_TIMEOUT = 10
 logger = getLogger('PLEX.db')
 
 
+class Connection(sqlite3.Connection):
+    """
+    A connection that knows how its transactions begin: deferred (BEGIN),
+    holding the write lock from the start (BEGIN IMMEDIATE, for writers), or
+    none at all (each statement on its own, for Kodi's texture cache).
+    """
+    begin_sql = 'BEGIN'
+
+    def begin(self):
+        if self.begin_sql:
+            self.execute(self.begin_sql)
+
+    def restart(self):
+        """Commit and begin the next transaction"""
+        self.commit()
+        self.begin()
+
+
 def catch_operationalerrors(method):
     """
     sqlite.OperationalError is raised immediately if another DB connection
@@ -26,6 +44,10 @@ def catch_operationalerrors(method):
     OSMC, so use general "catch all"
 
     Also see https://github.com/mattn/go-sqlite3/issues/274
+
+    Retrying means committing what the transaction did so far. A writer that
+    holds the write lock from the start (BEGIN IMMEDIATE) does not get this
+    error halfway; if it does, we must not commit half its work.
     """
     @wraps(method)
     def wrapper(self, *args, **kwargs):
@@ -36,26 +58,31 @@ def catch_operationalerrors(method):
                 return method(self, *args, **kwargs)
             except Exception as err:
                 if 'database is locked' not in str(err):
-                    # Not an error we want to catch, so reraise it
                     raise
+                if _holds_write_lock(self.kodiconn):
+                    raise LockedDatabase('Database is locked')
                 attempts -= 1
                 logger.debug('DB locked, retrying in %.2fs (%d left)',
                              timeout, attempts)
                 if attempts == 0:
-                    # Reraise in order to NOT catch nested OperationalErrors
                     raise LockedDatabase('Database is locked')
-                # Release our transaction so VACUUM (or other
-                # exclusive operations) can proceed
                 _close_transaction(self.kodiconn)
                 if self.artconn:
                     _close_transaction(self.artconn)
                 if app.APP.monitor.waitForAbort(timeout):
-                    return
+                    # The caller must not go on as if it worked
+                    raise LockedDatabase('Database was locked and we need '
+                                         'to exit')
                 timeout = min(timeout * 2, DB_WRITE_ATTEMPTS_TIMEOUT_MAX)
                 _begin_transaction(self.kodiconn)
                 if self.artconn:
                     _begin_transaction(self.artconn)
     return wrapper
+
+
+def _holds_write_lock(conn):
+    return (getattr(conn, 'begin_sql', None) == 'BEGIN IMMEDIATE' and
+            conn.in_transaction)
 
 
 def _close_transaction(conn):
@@ -67,7 +94,7 @@ def _close_transaction(conn):
 
 def _begin_transaction(conn):
     try:
-        conn.execute('BEGIN')
+        conn.begin()
     except Exception:
         pass
 
@@ -80,13 +107,18 @@ def _initial_db_connection_setup(conn):
     conn.execute('PRAGMA journal_mode = WAL;')
     conn.execute('PRAGMA cache_size = -8000;')
     conn.execute('PRAGMA synchronous = NORMAL;')
-    conn.execute('BEGIN')
+    conn.begin()
 
 
-def connect(media_type=None):
+def connect(media_type=None, write=False):
     """
     Open a connection to the Kodi database.
         media_type: 'video' (standard if not passed), 'plex', 'music', 'texture'
+        write=True: for a writer, its transactions hold the write lock from
+            the start. Nobody else can write in the meantime, so keep them
+            short
+    Kodi's texture cache is written without transactions: Kodi caches
+    images all the time and must not wait for us.
     """
     if media_type == "plex":
         db_path = v.DB_PLEX_PATH
@@ -100,7 +132,12 @@ def connect(media_type=None):
         db_path = v.DB_VIDEO_PATH
     conn = sqlite3.connect(db_path,
                            timeout=DB_CONNECTION_TIMEOUT,
-                           isolation_level=None)
+                           isolation_level=None,
+                           factory=Connection)
+    if media_type == 'texture':
+        conn.begin_sql = None
+    elif write:
+        conn.begin_sql = 'BEGIN IMMEDIATE'
     attempts = DB_WRITE_ATTEMPTS
     timeout = DB_WRITE_ATTEMPTS_TIMEOUT
     while True:
@@ -108,14 +145,11 @@ def connect(media_type=None):
             _initial_db_connection_setup(conn)
         except sqlite3.OperationalError as err:
             if err.args[0] and 'database is locked' not in err.args[0]:
-                # Not an error we want to catch, so reraise it
                 raise
             attempts -= 1
             if attempts == 0:
-                # Reraise in order to NOT catch nested OperationalErrors
                 raise LockedDatabase('Database is locked')
             if app.APP.monitor.waitForAbort(timeout):
-                # PKC needs to quit
                 raise LockedDatabase('Database was locked and we need to exit')
             timeout = min(timeout * 2, DB_WRITE_ATTEMPTS_TIMEOUT_MAX)
         else:

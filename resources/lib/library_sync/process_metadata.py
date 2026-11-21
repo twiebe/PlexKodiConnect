@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from logging import getLogger
+import queue
+from time import monotonic
 
 from . import common, sections
 from ..plex_db import PlexDB
@@ -8,6 +10,8 @@ from .. import backgroundthread, app
 LOG = getLogger('PLEX.sync.process_metadata')
 
 COMMIT_TO_DB_EVERY_X_ITEMS = 500
+# While we write, Kodi cannot: commit at least this often [seconds]
+COMMIT_INTERVAL = 1.0
 
 
 class ProcessMetadataThread(common.LibrarySyncMixin,
@@ -52,13 +56,18 @@ class ProcessMetadataThread(common.LibrarySyncMixin,
             LOG.warn('Sync not successful for section %s', self.last_section)
             self.successful = False
 
-    def _get(self):
+    def _get(self, before_waiting=None):
         """
         The next item with an xml, or None for the sentinel or if we need to
-        stop
+        stop. Calls before_waiting() before it waits for one.
         """
         while True:
-            item = common.queue_get(self, self.processing_queue)
+            try:
+                item = self.processing_queue.get(block=False)
+            except queue.Empty:
+                if before_waiting:
+                    before_waiting()
+                item = common.queue_get(self, self.processing_queue)
             if item is None:
                 return None
             self.processing_queue.task_done()
@@ -96,19 +105,33 @@ class ProcessMetadataThread(common.LibrarySyncMixin,
                 self.start_section(item['section'])
                 section = item['section']
             with section.context(self.current_time) as context:
+                last_commit = monotonic()
+
+                def commit(begin=True):
+                    nonlocal processed, last_commit
+                    if processed:
+                        context.commit(begin=begin)
+                        processed = 0
+                        last_commit = monotonic()
+
+                def release():
+                    # Don't keep the DBs locked while we wait for downloads
+                    commit(begin=False)
+
                 while not self.should_cancel():
                     if item is None or item['section'] != section:
                         break
                     self.update_progressbar(section,
                                             item['xml'][0].get('title'),
                                             section.count)
+                    context.begin()
                     context.add_update(item['xml'][0],
                                        section_name=section.name,
                                        section_id=section.section_id,
                                        children=item['children'])
                     processed += 1
                     section.count += 1
-                    if processed == COMMIT_TO_DB_EVERY_X_ITEMS:
-                        processed = 0
-                        context.commit()
-                    item = self._get()
+                    if (processed == COMMIT_TO_DB_EVERY_X_ITEMS or
+                            monotonic() - last_commit > COMMIT_INTERVAL):
+                        commit()
+                    item = self._get(before_waiting=release)
