@@ -12,13 +12,19 @@ LOG = getLogger('PLEX.migration')
 def check_migration():
     LOG.info('Checking whether we need to migrate something')
     last_migration = utils.settings('last_migrated_PKC_version')
+    version = utils.upstream_version(v.ADDON_VERSION)
     # Ensure later migration if user downgraded PKC!
-    utils.settings('last_migrated_PKC_version', value=v.ADDON_VERSION)
+    utils.settings('last_migrated_PKC_version', value=version)
+    # Stored by 1:3.12.6-1 as it is
+    created_with = utils.settings('dbCreatedWithVersion')
+    if created_with != utils.upstream_version(created_with):
+        utils.settings('dbCreatedWithVersion',
+                       value=utils.upstream_version(created_with))
 
     if last_migration == '':
         LOG.info('New, clean PKC installation - no migration necessary')
         return
-    elif last_migration == v.ADDON_VERSION:
+    elif utils.upstream_version(last_migration) == version:
         LOG.info('Already migrated to PKC version %s' % v.ADDON_VERSION)
         return
 
@@ -37,4 +43,4 @@ def check_migration():
         sections.delete_videonode_files()
         utils.reboot_kodi()
 
-    utils.settings('last_migrated_PKC_version', value=v.ADDON_VERSION)
+    utils.settings('last_migrated_PKC_version', value=version)
