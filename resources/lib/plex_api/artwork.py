@@ -4,7 +4,7 @@ from logging import getLogger
 
 from ..kodi_db import KodiVideoDB, KodiMusicDB
 from ..downloadutils import DownloadUtils as DU
-from .. import utils, variables as v, app
+from .. import utils, variables as v, app, art_sizes
 
 from . import fanart_lookup
 
@@ -48,8 +48,11 @@ class Artwork(object):
                 # e.g. playlists
                 pass
             artwork = f'{artwork}?width={width}&height={height}'
-        artwork = (f'{app.CONN.server}/photo/:/transcode?width=1920&height=1920&'
-                   f'minSize=1&upscale=0&url={utils.quote(artwork)}')
+        # The PMS scales the artwork to the size setting of its kind
+        size = art_sizes.size_query(art_sizes.art_kind(art_kind,
+                                                       self.plex_type))
+        artwork = (f'{app.CONN.server}/photo/:/transcode?{size}&'
+                   f'url={utils.quote(artwork)}')
         artwork = self.attach_plex_token_to_url(artwork)
         return artwork
 

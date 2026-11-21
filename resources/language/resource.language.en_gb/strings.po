@@ -1739,3 +1739,93 @@ msgstr ""
 msgctxt "#39726"
 msgid "Enable transcoding using h265/HEVC codec (restart Kodi!)"
 msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31100"
+msgid "Artwork size (applies to the library at once)"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31101"
+msgid "Poster width"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31102"
+msgid "Still and landscape width"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31103"
+msgid "Fanart width"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31104"
+msgid "Banner width"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31105"
+msgid "Auto [default]"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31106"
+msgid "Unlimited"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31107"
+msgid "320 px"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31108"
+msgid "480 px"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31109"
+msgid "640 px"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31110"
+msgid "960 px"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31111"
+msgid "1280 px"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31112"
+msgid "1920 px"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31113"
+msgid "3840 px"
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31114"
+msgid "Largest width of posters the PMS sends. Auto fits poster cards at the resolution of the GUI: Kodi draws a much larger image on a small card pixelated."
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31115"
+msgid "Largest width of episode stills the PMS sends. Auto fits episode cards at the resolution of the GUI."
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31116"
+msgid "Largest width of fanart, the backgrounds that fill the screen, the PMS sends. Auto fits the screen at the resolution of the GUI."
+msgstr ""
+
+# PKC Settings - Artwork size
+msgctxt "#31117"
+msgid "Largest width of banners the PMS sends. Auto fits a logo at the resolution of the GUI. Music and photos keep their artwork size."
+msgstr ""

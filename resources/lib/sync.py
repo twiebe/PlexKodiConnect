@@ -6,6 +6,7 @@ import xbmc
 from .downloadutils import DownloadUtils as DU
 from . import library_sync, timing
 from . import backgroundthread, utils, artwork, variables as v, app
+from . import art_sizes
 from . import kodi_db
 
 if library_sync.PLAYLIST_SYNC_ENABLED:
@@ -23,6 +24,8 @@ class Sync(backgroundthread.KillableThread):
         self.last_full_sync = 0
         self.metadata_thread = None
         self.image_cache_thread = None
+        # The artwork sizes the Kodi library's URLs are written with
+        self.art_key = utils.settings('artSizeApplied')
         # Lock used to wait on a full sync, e.g. on initial sync
         # self.lock = backgroundthread.threading.Lock()
         super(Sync, self).__init__()
@@ -117,6 +120,29 @@ class Sync(backgroundthread.KillableThread):
             self.image_cache_thread.join()
         self.image_cache_thread = artwork.ImageCachingThread()
         self.image_cache_thread.start()
+
+    def apply_art_sizes(self):
+        """
+        Write the artwork URLs of the Kodi library anew when the artwork size
+        settings, or the GUI resolution their Auto follows, changed since they
+        were written.
+        """
+        key = art_sizes.art_key()
+        if key == self.art_key:
+            return
+        self.art_key = key
+        try:
+            with kodi_db.KodiVideoDB() as kodidb:
+                changed = art_sizes.resize_urls(kodidb.cursor)
+        except Exception:
+            # not again until the next start: it compares with the key written
+            # last
+            LOG.exception('Could not write the artwork sizes')
+            return
+        utils.settings('artSizeApplied', value=key)
+        if changed:
+            app.APP.update_widgets = True
+            self.start_image_cache_thread()
 
     def run(self):
         LOG.info("---===### Starting Sync Thread ###===---")
@@ -217,6 +243,9 @@ class Sync(backgroundthread.KillableThread):
                     # Reset the flag
                     app.SYNC.run_lib_scan = None
                     continue
+
+                # Changed artwork sizes (kodimonitor resets them)
+                self.apply_art_sizes()
 
                 # Standard syncs - don't force-show dialogs
                 now = timing.unix_timestamp()
