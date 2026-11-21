@@ -102,6 +102,15 @@ class ItemBase(object):
         if begin:
             self.begin()
 
+    def rollback(self):
+        """
+        Undo what this transaction wrote to the Plex and Kodi DB, e.g. one
+        item that failed. The texture DB has no transactions
+        """
+        for conn in (self.plexconn, self.kodiconn):
+            if conn:
+                conn.rollback()
+
     def begin(self):
         """Begin a transaction where there is none"""
         for conn in (self.plexconn, self.kodiconn, self.artconn):

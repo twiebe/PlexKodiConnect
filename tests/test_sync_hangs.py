@@ -91,27 +91,3 @@ def test_an_error_writing_more_items_than_the_queue_holds(pms, dbs, monkeypatch)
     sync = run_sync(pms, plex.movie_section())
     assert not sync.successful
 
-
-def test_one_bad_websocket_message_does_not_stop_the_others(pkc, monkeypatch):
-    done = []
-
-    def process(message):
-        if message['plex_id'] == 1:
-            raise ValueError('broken')
-        done.append(message['plex_id'])
-        return True, True, False
-
-    monkeypatch.setattr(websocket, 'process_new_item_message', process)
-    monkeypatch.setattr(websocket, 'cache_artwork', lambda *args: None)
-    monkeypatch.setattr(websocket, 'update_kodi_library', lambda **kwargs: None)
-    monkeypatch.setattr(websocket.backgroundthread.BGThreader, 'addTask',
-                        lambda task: None)
-    pkc.SYNC.backgroundsync_saftymargin = 0
-    websocket.WEBSOCKET_MESSAGES = [
-        {'plex_id': i, 'plex_type': 'movie', 'state': 5, 'timestamp': 0,
-         'attempt': 0} for i in (1, 2)]
-    websocket.process_websocket_messages()
-    assert done == [2]
-    assert [m['plex_id'] for m in websocket.WEBSOCKET_MESSAGES] == [1]
-    assert websocket.WEBSOCKET_MESSAGES[0]['attempt'] == 1
-

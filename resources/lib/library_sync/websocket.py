@@ -18,6 +18,8 @@ LOG = getLogger('PLEX.sync.websocket')
 CACHING_ENALBED = utils.settings('enableTextureCache') == "true"
 
 WEBSOCKET_MESSAGES = []
+# New items whose metadata one request asks for
+BATCH_SIZE = 20
 # Dict to save info for Plex items currently being played somewhere
 PLAYSTATE_SESSIONS = {}
 
@@ -75,21 +77,27 @@ def process_websocket_messages():
     now = timing.unix_timestamp()
     update_kodi_video_library, update_kodi_music_library = False, False
     delete_list = []
+    due = []
     for i, message in enumerate(WEBSOCKET_MESSAGES):
         if (message['state'] != 9 and
                 now - message['timestamp'] < app.SYNC.backgroundsync_saftymargin):
             # We haven't waited long enough for the PMS to finish processing the
             # item. Do it later (excepting deletions)
             continue
-        try:
-            if message['state'] == 9:
-                successful, video, music = process_delete_message(message)
-            else:
-                successful, video, music = process_new_item_message(message)
-        except Exception:
-            # One item the PMS told us about must not stop the sync for good
-            LOG.exception('Could not process message %s', message)
-            successful, video, music = False, False, False
+        due.append((i, message))
+    try:
+        xmls = download_new_items([m for _, m in due if m['state'] != 9])
+    except Exception:
+        LOG.exception('Could not download the new items')
+        xmls = {}
+    results = {}
+    try:
+        process_messages(due, xmls, results)
+    except Exception:
+        # E.g. a locked DB: the messages without a result are tried again
+        LOG.exception('Could not process the websocket messages')
+    for i, message in due:
+        successful, video, music = results.get(i, (False, False, False))
         if successful and message['state'] != 9:
             task = ProcessMetadataTask()
             task.setup(message['plex_id'],
@@ -117,27 +125,108 @@ def process_websocket_messages():
                             music=update_kodi_music_library)
 
 
-def process_new_item_message(message):
+def download_new_items(messages):
+    """
+    The metadata of the new and changed items of MESSAGES, BATCH_SIZE at a
+    time: {plex_id: xml}. Items missing are asked for alone later
+    """
+    plex_ids = [m['plex_id'] for m in messages]
+    xmls = {}
+    if len(plex_ids) < 2:
+        return xmls
+    for start in range(0, len(plex_ids), BATCH_SIZE):
+        answer = PF.plex_metadata(plex_ids[start:start + BATCH_SIZE])
+        if answer == 401:
+            break
+        xmls.update(answer)
+    return xmls
+
+
+def process_messages(due, xmls, results):
+    """
+    Writes the items of the messages DUE [(index, message)] to the DBs, one
+    DB context for all messages of a kind, and puts
+    (successful, video, music) into RESULTS by index. A failed item is rolled
+    back on its own
+    """
+    kinds = []
+    for _, message in due:
+        if message['plex_type'] not in kinds:
+            kinds.append(message['plex_type'])
+    artwork_to_cache = []
+    for plex_type in kinds:
+        messages = [(i, m) for i, m in due if m['plex_type'] == plex_type]
+        with itemtypes.ITEMTYPE_FROM_PLEXTYPE[plex_type](timing.unix_timestamp()) as typus:
+            typus.commit(begin=False)
+            for i, message in messages:
+                typus.begin()
+                try:
+                    if message['state'] == 9:
+                        result = process_delete_message(message, typus)
+                    else:
+                        result = process_new_item_message(
+                            message, typus, xmls.get(message['plex_id']))
+                    typus.commit(begin=False)
+                except Exception:
+                    # One item the PMS told us about must not stop the sync
+                    LOG.exception('Could not process message %s', message)
+                    typus.rollback()
+                    result = (False, False, False)
+                if result is None:
+                    # Of another kind than the message said: on its own
+                    continue
+                results[i] = result
+                if result[0] and message['state'] != 9:
+                    artwork_to_cache.append(message)
+    for i, message in due:
+        if i not in results and message['state'] != 9:
+            # The PMS gave an item of another kind than the message said
+            try:
+                results[i] = process_new_item_message(message, None,
+                                                      xmls.get(message['plex_id']))
+            except Exception:
+                LOG.exception('Could not process message %s', message)
+                continue
+            if results[i][0]:
+                artwork_to_cache.append(message)
+    for message in artwork_to_cache:
+        cache_artwork(message['plex_id'], message['plex_type'])
+
+
+def process_new_item_message(message, typus=None, xml=None):
+    """
+    Adds or updates the item of MESSAGE with TYPUS, an open DB context for
+    its kind, or with a context of its own. Returns (successful, video,
+    music), or None if TYPUS is of another kind than the PMS says the item is
+    """
     LOG.debug('Message: %s', message)
-    xml = PF.GetPlexMetadata(message['plex_id'])
+    if xml is None:
+        xml = PF.GetPlexMetadata(message['plex_id'])
     try:
         plex_type = xml[0].attrib['type']
     except (IndexError, KeyError, TypeError):
         LOG.error('Could not download metadata for %s', message['plex_id'])
         return False, False, False
+    if typus is not None and plex_type != message['plex_type']:
+        return None
     LOG.debug("Processing new/updated PMS item: %s", message['plex_id'])
-    with itemtypes.ITEMTYPE_FROM_PLEXTYPE[plex_type](timing.unix_timestamp()) as typus:
-        typus.add_update(xml[0],
-                         section_name=xml.get('librarySectionTitle'),
-                         section_id=utils.cast(int, xml.get('librarySectionID')))
-    cache_artwork(message['plex_id'], plex_type)
+    if typus is None:
+        with itemtypes.ITEMTYPE_FROM_PLEXTYPE[plex_type](timing.unix_timestamp()) as typus:
+            add_update(typus, xml)
+    else:
+        add_update(typus, xml)
     return True, plex_type in v.PLEX_VIDEOTYPES, plex_type in v.PLEX_AUDIOTYPES
 
 
-def process_delete_message(message):
+def add_update(typus, xml):
+    typus.add_update(xml[0],
+                     section_name=xml.get('librarySectionTitle'),
+                     section_id=utils.cast(int, xml.get('librarySectionID')))
+
+
+def process_delete_message(message, typus):
     plex_type = message['plex_type']
-    with itemtypes.ITEMTYPE_FROM_PLEXTYPE[plex_type](None) as typus:
-        typus.remove(message['plex_id'], plex_type=plex_type)
+    typus.remove(message['plex_id'], plex_type=plex_type)
     return True, plex_type in v.PLEX_VIDEOTYPES, plex_type in v.PLEX_AUDIOTYPES
 
 
