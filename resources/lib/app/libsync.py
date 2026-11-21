@@ -61,10 +61,6 @@ class Sync(object):
         # How many threads to download Plex metadata on sync?
         self.sync_thread_number = None
 
-        # Shall Kodi show dialogs for syncing/caching images? (e.g. images left
-        # to sync)
-        self.image_sync_notifications = None
-
         # Do we need to run a special library scan?
         self.run_lib_scan = None
         # Set if user decided to cancel sync
@@ -95,7 +91,7 @@ class Sync(object):
     def load(self):
         self.direct_paths = utils.settings('useDirectPaths') == '1'
         self.check_media_file_existence = \
-            utils.settings('check_media_file_existence') == '1'
+            utils.settings('checkMediaFileAccess') == 'true'
         self.enable_music = utils.settings('enableMusic') == 'true'
         self.artwork = utils.settings('usePlexArtwork') == 'true'
         self.replace_smb_path = utils.settings('replaceSMB') == 'true'
@@ -125,7 +121,6 @@ class Sync(object):
         self.full_sync_intervall = int(utils.settings('fullSyncInterval')) * 60
         self.backgroundsync_saftymargin = int(utils.settings('backgroundsync_saftyMargin'))
 
-        self.image_sync_notifications = utils.settings('imageSyncNotifications') == 'true'
 
         self.force_transcode_pix = utils.settings('force_transcode_pix') == 'true'
         # Trailers in Kodi DB will remain UNTIL DB is reset!

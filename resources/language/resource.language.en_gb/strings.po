@@ -1828,4 +1828,443 @@ msgstr ""
 # PKC Settings - Artwork size
 msgctxt "#31117"
 msgid "Largest width of banners the PMS sends. Auto fits a logo at the resolution of the GUI. Music and photos keep their artwork size."
+# PKC Settings - Help texts
+msgctxt "#31200"
+msgid "Name of the Plex Media Server PKC is connected to. Use the buttons below to change it."
+msgstr ""
+
+msgctxt "#31201"
+msgid "Address of the connected PMS. PKC fills it in when you choose a server."
+msgstr ""
+
+msgctxt "#31202"
+msgid "Port of the connected PMS. PKC fills it in when you choose a server."
+msgstr ""
+
+msgctxt "#31203"
+msgid "State of the live connection to the PMS that the background sync uses."
+msgstr ""
+
+msgctxt "#31204"
+msgid "Pick the PMS to use from the servers PKC finds on your network and on plex.tv."
+msgstr ""
+
+msgctxt "#31205"
+msgid "Enter the address and port of a PMS that PKC does not find on its own."
+msgstr ""
+
+msgctxt "#31206"
+msgid "PKC sets this when you choose a server. If on, PKC reads the sessions on the PMS to tell your playback apart from other users'."
+msgstr ""
+
+msgctxt "#31207"
+msgid "Connect to the PMS over HTTPS. PKC sets this when you choose a server."
+msgstr ""
+
+msgctxt "#31208"
+msgid "Client certificate file PKC sends to the PMS. Only needed if your server or a proxy in front of it asks for one."
+msgstr ""
+
+msgctxt "#31209"
+msgid "Check the certificate of the PMS on HTTPS connections. Set when you pick the server: on for a remote one, off for one in your network, whose certificate does not name its IP address."
+msgstr ""
+
+msgctxt "#31210"
+msgid "Show a notification when the PMS goes offline and when it is back."
+msgstr ""
+
+msgctxt "#31211"
+msgid "Ask which Plex Home user to sign in as on every Kodi start instead of reusing the last one. Needs the plex.tv sign-in."
+msgstr ""
+
+msgctxt "#31212"
+msgid "Whether PKC is signed in to plex.tv."
+msgstr ""
+
+msgctxt "#31213"
+msgid "plex.tv account PKC is signed in with."
+msgstr ""
+
+msgctxt "#31214"
+msgid "Plex Home user PKC uses right now. Library and playback state are synced for this user."
+msgstr ""
+
+msgctxt "#31215"
+msgid "Offer the plex.tv sign-in during setup, while no PMS is set. Turn off to use a local PMS without plex.tv."
+msgstr ""
+
+msgctxt "#31216"
+msgid "Sign out the current Plex Home user and pick another one. PKC then runs a full sync for the new user."
+msgstr ""
+
+msgctxt "#31217"
+msgid "Sign in to plex.tv, or sign out if PKC is signed in."
+msgstr ""
+
+msgctxt "#31218"
+msgid "Token PKC got from plex.tv when you signed in."
+msgstr ""
+
+msgctxt "#31219"
+msgid "Let Plex apps on your phone or tablet find this Kodi and control playback on it. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31220"
+msgid "Name under which this Kodi shows up in Plex apps and on the PMS. Empty uses Kodi's device name. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31221"
+msgid "Port on which PKC listens for commands from Plex apps. Change it only if another program uses it. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31222"
+msgid "Port PKC uses to announce itself to Plex apps on the network. Change it if PKC warns that it cannot open the port. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31223"
+msgid "Accept playback commands from Alexa through plex.tv. Needs the plex.tv sign-in and does not work for managed users. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31224"
+msgid "State of the connection to plex.tv that Alexa uses."
+msgstr ""
+
+msgctxt "#31225"
+msgid "Choose which Plex libraries PKC syncs into Kodi. A full sync follows."
+msgstr ""
+
+msgctxt "#31226"
+msgid "Minutes between two full syncs of all libraries. A due sync waits while a video plays."
+msgstr ""
+
+msgctxt "#31227"
+msgid "Run a full sync each time the screensaver ends."
+msgstr ""
+
+msgctxt "#31228"
+msgid "Show a progress dialog during full syncs."
+msgstr ""
+
+msgctxt "#31229"
+msgid "Keep the progress dialog open while a full sync updates the watched state and ratings of every item."
+msgstr ""
+
+msgctxt "#31230"
+msgid "With direct paths, check during a sync that Kodi can reach the media files of each library, and ask whether to stop the sync if not. Turn off if the files are only reachable at times."
+msgstr ""
+
+msgctxt "#31231"
+msgid "How many downloads from the PMS run at once during a sync. Lower it if the PMS or a small device struggles."
+msgstr ""
+
+msgctxt "#31232"
+msgid "How many items PKC asks the PMS for in one request. Lower it if large libraries time out."
+msgstr ""
+
+msgctxt "#31233"
+msgid "Keep Plex playlists and Kodi playlists in sync in both directions. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31234"
+msgid "Send only those Kodi playlists to Plex whose file name starts with the prefix below."
+msgstr ""
+
+msgctxt "#31235"
+msgid "Kodi playlists whose file name starts with this text are synced to Plex. Case does not matter."
+msgstr ""
+
+msgctxt "#31236"
+msgid "Bring only those Plex playlists into Kodi whose name starts with the prefix below."
+msgstr ""
+
+msgctxt "#31237"
+msgid "Plex playlists whose name starts with this text are synced to Kodi. Case does not matter."
+msgstr ""
+
+msgctxt "#31238"
+msgid "Apply changes on the PMS, such as new items and watched state, right away. Without it, only the periodic full sync picks them up. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31239"
+msgid "Seconds to wait after the PMS reports a new or changed item before PKC syncs it. Raise it if items arrive before the PMS has finished their metadata."
+msgstr ""
+
+msgctxt "#31240"
+msgid "Hold back changes from the PMS while a video plays and apply them afterwards."
+msgstr ""
+
+msgctxt "#31241"
+msgid "The trailer button opens a list of all Plex extras instead of playing a trailer. Items keep their old trailer until they are synced again."
+msgstr ""
+
+msgctxt "#31242"
+msgid "Show the number of versions of a movie or episode in place of its user rating. Items with a single version show no rating."
+msgstr ""
+
+msgctxt "#31243"
+msgid "Sync Plex music libraries into Kodi's music library. Turn off if you do not use music to speed up syncs."
+msgstr ""
+
+msgctxt "#31244"
+msgid "Add-on lets PKC start playback through the PMS. Direct Paths lets Kodi open the files on your network shares itself. Changing it needs a database reset."
+msgstr ""
+
+msgctxt "#31245"
+msgid "Enter user name and password for the network shares that hold your media, so that Kodi can open the files directly."
+msgstr ""
+
+msgctxt "#31248"
+msgid "Set by PKC once it has wiped the Kodi database after the first setup."
+msgstr ""
+
+msgctxt "#31249"
+msgid "Turn Windows network paths such as \\\\NAS\\media from the PMS into smb://NAS/media for Kodi."
+msgstr ""
+
+msgctxt "#31250"
+msgid "Replace the start of file paths from the PMS with your own paths, one pair per library type. Use it when Kodi reaches the files under a different path than the PMS."
+msgstr ""
+
+msgctxt "#31251"
+msgid "Start of movie paths as the PMS reports them, e.g. /volume1/movies."
+msgstr ""
+
+msgctxt "#31252"
+msgid "Path Kodi uses instead for movies, e.g. smb://NAS/movies."
+msgstr ""
+
+msgctxt "#31253"
+msgid "Start of TV show paths as the PMS reports them."
+msgstr ""
+
+msgctxt "#31254"
+msgid "Path Kodi uses instead for TV shows."
+msgstr ""
+
+msgctxt "#31255"
+msgid "Start of music paths as the PMS reports them."
+msgstr ""
+
+msgctxt "#31256"
+msgid "Path Kodi uses instead for music."
+msgstr ""
+
+msgctxt "#31257"
+msgid "Start of photo paths as the PMS reports them."
+msgstr ""
+
+msgctxt "#31258"
+msgid "Path Kodi uses instead for photos."
+msgstr ""
+
+msgctxt "#31259"
+msgid "URL-encode special characters in file paths, e.g. a space as %20. Turn it on only if Kodi fails to open such paths."
+msgstr ""
+
+msgctxt "#31260"
+msgid "Characters that stay as they are when PKC encodes http(s), dav(s) and (s)ftp paths."
+msgstr ""
+
+msgctxt "#31261"
+msgid "Play trailers from the PMS before a movie that you start from the beginning. Needs Plex Pass and Cinema Trailers set up on the PMS."
+msgstr ""
+
+msgctxt "#31262"
+msgid "Ask each time before playing trailers."
+msgstr ""
+
+msgctxt "#31263"
+msgid "How many trailers to play before the movie."
+msgstr ""
+
+msgctxt "#31264"
+msgid "Show a skip button during intros that the PMS has marked."
+msgstr ""
+
+msgctxt "#31265"
+msgid "Skip marked intros on their own, without the button."
+msgstr ""
+
+msgctxt "#31266"
+msgid "Show a skip button during credits that the PMS has marked. With the Up Next add-on, Up Next takes over if there is a next episode."
+msgstr ""
+
+msgctxt "#31267"
+msgid "Skip marked credits on their own, without the button."
+msgstr ""
+
+msgctxt "#31268"
+msgid "Show a skip button during commercials that the PMS has marked, e.g. in DVR recordings."
+msgstr ""
+
+msgctxt "#31269"
+msgid "Skip marked commercials on their own, without the button."
+msgstr ""
+
+msgctxt "#31270"
+msgid "Hide the skip button after a few seconds. It shows again if you seek back into the marked part."
+msgstr ""
+
+msgctxt "#31271"
+msgid "Seconds the skip button stays on screen."
+msgstr ""
+
+msgctxt "#31272"
+msgid "If a movie or episode has several versions, play the first one instead of asking which one."
+msgstr ""
+
+msgctxt "#31273"
+msgid "Plex starts playback with the audio track set on the PMS. Kodi uses its own audio language settings."
+msgstr ""
+
+msgctxt "#31274"
+msgid "Plex starts playback with the subtitles set on the PMS. Kodi uses its own subtitle settings."
+msgstr ""
+
+msgctxt "#31277"
+msgid "How PKC plays add-on paths. Try Direct Path opens the file itself if Kodi can reach it, else plays it from the PMS. Use Direct Stream or Force Transcode if playback stutters or fails."
+msgstr ""
+
+msgctxt "#31278"
+msgid "Resolution and bitrate the PMS transcodes to when transcoding is needed."
+msgstr ""
+
+msgctxt "#31279"
+msgid "Let the PMS lower the transcoding quality to fit your network speed. Turn off for Chromecast."
+msgstr ""
+
+msgctxt "#31280"
+msgid "Transcode every video whose bitrate is higher than this. Useful on a slow network or a weak device."
+msgstr ""
+
+msgctxt "#31281"
+msgid "Transcode h265/HEVC videos from this resolution up. Use it if your device cannot decode HEVC smoothly."
+msgstr ""
+
+msgctxt "#31282"
+msgid "Transcode AV1 videos from this resolution up. Use it if your device cannot decode AV1 smoothly."
+msgstr ""
+
+msgctxt "#31283"
+msgid "Transcode 10-bit h264 (Hi10P) videos, which many devices cannot decode."
+msgstr ""
+
+msgctxt "#31284"
+msgid "Allow the PMS to transcode into h265/HEVC instead of only h264. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31285"
+msgid "Make audio louder when the PMS transcodes. 0 leaves it as it is."
+msgstr ""
+
+msgctxt "#31286"
+msgid "Size in percent of subtitles that the PMS burns into a transcoded video."
+msgstr ""
+
+msgctxt "#31287"
+msgid "Let the PMS convert all photos before Kodi shows them, not only formats Kodi cannot open."
+msgstr ""
+
+msgctxt "#31288"
+msgid "When transcoding, use the audio track and subtitles set on the PMS instead of asking for them."
+msgstr ""
+
+msgctxt "#31289"
+msgid "If a trailer has several versions, play the first one instead of asking which one."
+msgstr ""
+
+msgctxt "#31293"
+msgid "Delete items from the PMS through the PKC context menu without a confirmation. The files are gone for good."
+msgstr ""
+
+msgctxt "#31294"
+msgid "Sync posters, fanart and other artwork from the PMS into Kodi. Turn off to keep Kodi's own artwork."
+msgstr ""
+
+msgctxt "#31295"
+msgid "Download all artwork into Kodi's texture cache in the background, so lists scroll smoothly. Needs the Kodi web server, which PKC turns on."
+msgstr ""
+
+msgctxt "#31296"
+msgid "Look up missing artwork, such as fanart and collection art, on FanartTV and TheMovieDB after each sync."
+msgstr ""
+
+msgctxt "#31297"
+msgid "Keep collection artwork already in Kodi and only add what is missing from the online lookup."
+msgstr ""
+
+msgctxt "#31298"
+msgid "Start the lookup for missing artwork now instead of waiting for the next sync."
+msgstr ""
+
+msgctxt "#31300"
+msgid "Keep caching artwork while a video plays. Turn off if playback stutters on a weak device. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31301"
+msgid "Download all artwork of the synced libraries into Kodi's texture cache now. This can take long on large libraries."
+msgstr ""
+
+msgctxt "#31302"
+msgid "Whether the lookup for missing artwork has finished."
+msgstr ""
+
+msgctxt "#31303"
+msgid "Whether PKC has finished caching all artwork."
+msgstr ""
+
+msgctxt "#31304"
+msgid "Add Extras as its own entry to Kodi's context menu. When off, Extras is in the PKC context menu. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31305"
+msgid "Rewrite the Kodi video nodes and playlists of all synced libraries. Use it after changing the settings below."
+msgstr ""
+
+msgctxt "#31306"
+msgid "How many items the library widgets, such as Recently Added, show at most."
+msgstr ""
+
+msgctxt "#31307"
+msgid "How many items PKC fetches from the PMS for widgets."
+msgstr ""
+
+msgctxt "#31308"
+msgid "Put the show title in front of episode titles in On Deck."
+msgstr ""
+
+msgctxt "#31309"
+msgid "Put season and episode number, e.g. S01E02, in front of episode titles in On Deck."
+msgstr ""
+
+msgctxt "#31310"
+msgid "Include episodes you have already watched in Recently Added."
+msgstr ""
+
+msgctxt "#31311"
+msgid "Put the show title in front of episode titles in Recently Added."
+msgstr ""
+
+msgctxt "#31312"
+msgid "Put season and episode number, e.g. S01E02, in front of episode titles in Recently Added."
+msgstr ""
+
+msgctxt "#31313"
+msgid "Include movies you have already watched in Recently Added."
+msgstr ""
+
+msgctxt "#31314"
+msgid "Seconds PKC waits after Kodi starts before it connects. Raise it if the network or the PMS is not ready yet when Kodi starts."
+msgstr ""
+
+msgctxt "#31315"
+msgid "Sync every item from the PMS again and overwrite what is in Kodi. Use it if items are missing or wrong."
+msgstr ""
+
+msgctxt "#31316"
+msgid "Give this Kodi a new device ID, e.g. after copying the Kodi setup to another device, so the PMS tells them apart. Needs a Kodi restart."
+msgstr ""
+
+msgctxt "#31317"
+msgid "Empty the Kodi database and restart Kodi, then sync everything again. You are asked whether to reset the PKC settings as well."
 msgstr ""
