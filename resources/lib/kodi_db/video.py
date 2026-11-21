@@ -682,12 +682,29 @@ class KodiVideoDB(common.KodiDBBase):
         Adds a resume marker for a video library item. Will even set 2,
         considering add-on path widget hacks.
         """
-        # Delete existing resume point
-        self.cursor.execute('DELETE FROM bookmark WHERE idFile = ?', (file_id,))
         # Set watched count
         # Be careful to set playCount to None, NOT the int zero!
-        self.cursor.execute('UPDATE files SET playCount = ?, lastPlayed = ? WHERE idFile = ?',
-                            (playcount or None, dateplayed, file_id))
+        # Only write what changed: the playstate passes come by every item
+        self.cursor.execute('''
+            UPDATE files SET playCount = ?, lastPlayed = ?
+            WHERE idFile = ? AND (playCount IS NOT ? OR lastPlayed IS NOT ?)
+        ''', (playcount or None, dateplayed, file_id, playcount or None,
+              dateplayed))
+        # The resume point, Kodi's bookmark of type 1 (RESUME). Leave the
+        # user's own bookmarks alone
+        self.cursor.execute('''
+            SELECT timeInSeconds, totalTimeInSeconds FROM bookmark
+            WHERE idFile = ? AND type = 1
+        ''', (file_id, ))
+        old = self.cursor.fetchall()
+        if resume_seconds:
+            if (len(old) == 1 and abs(old[0][0] - resume_seconds) < 1 and
+                    abs((old[0][1] or 0) - (total_seconds or 0)) < 1):
+                return
+        elif not old:
+            return
+        self.cursor.execute('DELETE FROM bookmark WHERE idFile = ? AND type = 1',
+                            (file_id,))
         # Set the resume bookmark
         if resume_seconds:
             self.cursor.execute('''
@@ -1101,8 +1118,10 @@ class KodiVideoDB(common.KodiDBBase):
         elif kodi_type == v.KODI_TYPE_SHOW:
             table = kodi_type
             identifier = 'idShow'
-        self.cursor.execute('''UPDATE %s SET userrating = ? WHERE ? = ?''' % table,
-                            (userrating, identifier, kodi_id))
+        # Only write what changed: the playstate passes come by every item
+        self.cursor.execute('''
+            UPDATE %s SET userrating = ? WHERE %s = ? AND userrating IS NOT ?
+        ''' % (table, identifier), (userrating, kodi_id, userrating))
 
     @property
     def has_video_version_table(self):

@@ -129,15 +129,12 @@ class PlexDBBase(object):
         method = getattr(self, 'entry_to_%s' % v.PLEX_TYPE_FROM_KODI_TYPE[kodi_type])
         return method(self.cursor.fetchone())
 
-    def plex_id_by_last_sync(self, plex_type, last_sync, limit):
+    def plex_ids_and_sections(self, plex_type):
         """
-        Returns an iterator for all items where the last_sync is NOT identical
+        Returns an iterator of (plex_id, section_id) for all items of plex_type
         """
-        query = '''
-            SELECT plex_id FROM %s
-            WHERE last_sync <> ? OR last_sync IS NULL LIMIT %s
-        ''' % (plex_type, limit)
-        return (x[0] for x in self.cursor.execute(query, (last_sync, )))
+        return self.cursor.execute('SELECT plex_id, section_id FROM %s'
+                                   % plex_type)
 
     def checksum(self, plex_id, plex_type):
         """
@@ -149,13 +146,6 @@ class PlexDBBase(object):
             return self.cursor.fetchone()[0]
         except TypeError:
             pass
-
-    def update_last_sync(self, plex_id, plex_type, last_sync):
-        """
-        Sets a new timestamp for plex_id
-        """
-        self.cursor.execute('UPDATE %s SET last_sync = ? WHERE plex_id = ?' % plex_type,
-                            (last_sync, plex_id))
 
     def remove(self, plex_id, plex_type):
         """

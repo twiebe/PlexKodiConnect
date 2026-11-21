@@ -452,9 +452,10 @@ class KodiMusicDB(common.KodiDBBase):
             identifier = 'idAlbum'
         else:
             return
-        self.cursor.execute('''UPDATE %s SET %s = ? WHERE ? = ?'''
-                            % (kodi_type, column),
-                            (userrating, identifier, kodi_id))
+        self.cursor.execute('''
+            UPDATE %s SET %s = ? WHERE %s = ? AND %s IS NOT ?
+        ''' % (kodi_type, column, identifier, column),
+            (userrating, kodi_id, userrating))
 
     @db.catch_operationalerrors
     def remove_albuminfosong(self, kodi_id):
