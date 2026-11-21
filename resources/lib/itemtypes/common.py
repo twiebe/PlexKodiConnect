@@ -56,9 +56,9 @@ class ItemBase(object):
         if self.lock:
             PLEXDB_LOCK.acquire()
             KODIDB_LOCK.acquire()
-        self.plexconn = db.connect('plex')
+        self.plexconn = db.connect('plex', write=True)
         self.plexcursor = self.plexconn.cursor()
-        self.kodiconn = db.connect('video')
+        self.kodiconn = db.connect('video', write=True)
         self.kodicursor = self.kodiconn.cursor()
         self.artconn = db.connect('texture')
         self.artcursor = self.artconn.cursor()
@@ -91,14 +91,22 @@ class ItemBase(object):
                 PLEXDB_LOCK.release()
                 KODIDB_LOCK.release()
 
-    def commit(self):
-        self.plexconn.commit()
-        self.plexconn.execute('BEGIN')
-        self.kodiconn.commit()
-        self.kodiconn.execute('BEGIN')
-        if self.artconn:
-            self.artconn.commit()
-            self.artconn.execute('BEGIN')
+    def commit(self, begin=True):
+        """
+        Commit. begin=False: don't begin the next transaction yet, so others
+        can write until begin() - e.g. while we wait for the PMS
+        """
+        for conn in (self.plexconn, self.kodiconn, self.artconn):
+            if conn:
+                conn.commit()
+        if begin:
+            self.begin()
+
+    def begin(self):
+        """Begin a transaction where there is none"""
+        for conn in (self.plexconn, self.kodiconn, self.artconn):
+            if conn and not conn.in_transaction:
+                conn.begin()
 
     def set_fanart(self, artworks, kodi_id, kodi_type):
         """

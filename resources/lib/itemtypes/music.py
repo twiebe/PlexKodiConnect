@@ -19,9 +19,9 @@ class MusicMixin(object):
         if self.lock:
             PLEXDB_LOCK.acquire()
             KODIDB_LOCK.acquire()
-        self.plexconn = db.connect('plex')
+        self.plexconn = db.connect('plex', write=True)
         self.plexcursor = self.plexconn.cursor()
-        self.kodiconn = db.connect('music')
+        self.kodiconn = db.connect('music', write=True)
         self.kodicursor = self.kodiconn.cursor()
         self.artconn = db.connect('texture')
         self.artcursor = self.artconn.cursor()

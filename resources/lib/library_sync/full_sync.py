@@ -2,15 +2,17 @@
 # -*- coding: utf-8 -*-
 from logging import getLogger
 import queue
+import sqlite3
+from time import monotonic
 
 import xbmcgui
 
 from .get_metadata import GetMetadataThread
 from .fill_metadata_queue import FillMetadataQueue
-from .process_metadata import ProcessMetadataThread
+from .process_metadata import ProcessMetadataThread, COMMIT_INTERVAL
 from . import common, sections
 from .. import utils, timing, backgroundthread as bg, variables as v, app
-from .. import plex_functions as PF, itemtypes, path_ops
+from .. import plex_functions as PF, itemtypes, path_ops, db
 from ..plex_db import PlexDB
 
 if common.PLAYLIST_SYNC_ENABLED:
@@ -74,8 +76,22 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
         This will allow us to have "concurrent" connections during adding/
         updating items, increasing sync speed tremendously.
         Using the same DB with e.g. WAL mode did not really work out...
+
+        Copied with SQLite's backup, not as a file: in WAL mode the latest
+        changes may still be in plex.db-wal, and a copy made while SQLite
+        writes back to plex.db can be broken. A plex-copy.db-wal left behind
+        would be applied to the new copy.
         """
-        path_ops.copyfile(v.DB_PLEX_PATH, v.DB_PLEX_COPY_PATH)
+        for suffix in ('-wal', '-shm'):
+            if path_ops.exists(v.DB_PLEX_COPY_PATH + suffix):
+                path_ops.remove(v.DB_PLEX_COPY_PATH + suffix)
+        source = sqlite3.connect(v.DB_PLEX_PATH, timeout=db.DB_CONNECTION_TIMEOUT)
+        target = sqlite3.connect(v.DB_PLEX_COPY_PATH)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+            source.close()
 
     @utils.log_time
     def process_new_and_changed_items(self, section_queue, processing_queue):
@@ -125,6 +141,7 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                   section.number_of_items, section)
         try:
             with section.context(self.current_time) as context:
+                last_commit = monotonic()
                 for xml in section.iterator:
                     section.count += 1
                     if not context.update_userdata(xml, section.plex_type):
@@ -134,8 +151,11 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                                                     section.plex_type,
                                                     self.current_time)
                     self.update_progressbar(section, '', section.count - 1)
-                    if section.count % PLAYSTATE_BATCH_SIZE == 0:
+                    if (section.count % PLAYSTATE_BATCH_SIZE == 0 or
+                            monotonic() - last_commit > COMMIT_INTERVAL):
+                        # While we write, Kodi cannot
                         context.commit()
+                        last_commit = monotonic()
         except RuntimeError:
             LOG.error('Could not entirely process section %s', section)
             self.successful = False
