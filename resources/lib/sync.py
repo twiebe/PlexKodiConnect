@@ -22,9 +22,14 @@ def load_changed_settings():
     e.g. the paths it writes must not change halfway
     """
     if app.SYNC.settings_changed:
-        app.SYNC.settings_changed = False
         LOG.info('Loading changed settings')
-        app.SYNC.load()
+        try:
+            app.SYNC.load()
+        except Exception:
+            # E.g. an empty number: keep the old values, try again next time
+            LOG.exception('Could not load the changed settings')
+            return
+        app.SYNC.settings_changed = False
 
 
 class Sync(backgroundthread.KillableThread):

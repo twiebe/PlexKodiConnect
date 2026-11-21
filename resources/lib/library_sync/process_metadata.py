@@ -12,6 +12,15 @@ LOG = getLogger('PLEX.sync.process_metadata')
 COMMIT_TO_DB_EVERY_X_ITEMS = 500
 # While we write, Kodi cannot: commit at least this often [seconds]
 COMMIT_INTERVAL = 1.0
+# How long we leave the DBs to Kodi after a commit. Kodi's busy handler
+# retries every 100 ms: if we begin again at once, it never gets a turn
+YIELD_TO_KODI = 0.15
+
+
+
+def yield_to_kodi(thread):
+    """Wait so Kodi gets the write lock if it waits for it"""
+    app.APP.monitor.waitForAbort(YIELD_TO_KODI)
 
 
 class ProcessMetadataThread(common.LibrarySyncMixin,
@@ -107,16 +116,19 @@ class ProcessMetadataThread(common.LibrarySyncMixin,
             with section.context(self.current_time) as context:
                 last_commit = monotonic()
 
-                def commit(begin=True):
+                def commit():
+                    # Let Kodi write, the next item begins anew
                     nonlocal processed, last_commit
-                    if processed:
-                        context.commit(begin=begin)
-                        processed = 0
-                        last_commit = monotonic()
+                    context.commit(begin=False)
+                    processed = 0
+                    yield_to_kodi(self)
+                    last_commit = monotonic()
 
                 def release():
                     # Don't keep the DBs locked while we wait for downloads
-                    commit(begin=False)
+                    nonlocal processed
+                    context.commit(begin=False)
+                    processed = 0
 
                 while not self.should_cancel():
                     if item is None or item['section'] != section:

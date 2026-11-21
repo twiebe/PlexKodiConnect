@@ -49,6 +49,15 @@ class ItemBase(object):
         self.artconn = kodidb.artconn if kodidb else None
         self.artcursor = kodidb.artcursor if kodidb else None
 
+    # The Kodi DB of this kind of item
+    KODI_DB = 'video'
+
+    def kodi_db(self):
+        return KodiVideoDB(texture_db=True,
+                           kodiconn=self.kodiconn,
+                           artconn=self.artconn,
+                           lock=False)
+
     def __enter__(self):
         """
         Open DB connections and cursors
@@ -56,17 +65,25 @@ class ItemBase(object):
         if self.lock:
             PLEXDB_LOCK.acquire()
             KODIDB_LOCK.acquire()
-        self.plexconn = db.connect('plex', write=True)
-        self.plexcursor = self.plexconn.cursor()
-        self.kodiconn = db.connect('video', write=True)
-        self.kodicursor = self.kodiconn.cursor()
-        self.artconn = db.connect('texture')
-        self.artcursor = self.artconn.cursor()
+        self.plexconn = self.kodiconn = self.artconn = None
+        try:
+            self.plexconn = db.connect('plex', write=True)
+            self.plexcursor = self.plexconn.cursor()
+            self.kodiconn = db.connect(self.KODI_DB, write=True)
+            self.kodicursor = self.kodiconn.cursor()
+            self.artconn = db.connect('texture')
+            self.artcursor = self.artconn.cursor()
+        except Exception:
+            # __exit__ will not run: let go of everything we hold
+            for conn in (self.plexconn, self.kodiconn, self.artconn):
+                if conn:
+                    conn.close()
+            if self.lock:
+                PLEXDB_LOCK.release()
+                KODIDB_LOCK.release()
+            raise
         self.plexdb = PlexDB(plexconn=self.plexconn, lock=False)
-        self.kodidb = KodiVideoDB(texture_db=True,
-                                  kodiconn=self.kodiconn,
-                                  artconn=self.artconn,
-                                  lock=False)
+        self.kodidb = self.kodi_db()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

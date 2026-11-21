@@ -10,7 +10,8 @@ import xbmcgui
 
 from .get_metadata import GetMetadataThread
 from .fill_metadata_queue import FillMetadataQueue
-from .process_metadata import ProcessMetadataThread, COMMIT_INTERVAL
+from .process_metadata import ProcessMetadataThread, COMMIT_INTERVAL, \
+    yield_to_kodi
 from . import common, sections
 from .. import utils, timing, backgroundthread as bg, variables as v, app
 from .. import plex_functions as PF, itemtypes, path_ops, db
@@ -104,21 +105,31 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                                            section_queue,
                                            get_metadata_queue,
                                            processing_queue)
-        scanner_thread.start()
-        metadata_threads = [
-            GetMetadataThread(get_metadata_queue, processing_queue)
-            for _ in range(int(utils.settings('syncThreadNumber')))
-        ]
-        for t in metadata_threads:
-            t.start()
+        aborted = []
+
         def stop_feeding():
             scanner_thread.cancel()
             for t in metadata_threads:
                 t.cancel()
+
+        def abort():
+            # E.g. the PMS answers 401: stop all of it, not only one thread
+            aborted.append(True)
+            stop_feeding()
+            process_thread.cancel()
+
+        metadata_threads = [
+            GetMetadataThread(get_metadata_queue, processing_queue,
+                              on_abort=abort)
+            for _ in range(int(utils.settings('syncThreadNumber')))
+        ]
         process_thread = ProcessMetadataThread(self.current_time,
                                                processing_queue,
                                                self.update_progressbar,
                                                on_failure=stop_feeding)
+        scanner_thread.start()
+        for t in metadata_threads:
+            t.start()
         process_thread.start()
         LOG.debug('Waiting for scanner thread to finish up')
         scanner_thread.join()
@@ -127,7 +138,8 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
             t.join()
         LOG.debug('Download metadata threads finished')
         process_thread.join()
-        self.successful = process_thread.successful and scanner_thread.successful
+        self.successful = (process_thread.successful and
+                           scanner_thread.successful and not aborted)
         LOG.debug('threads finished work. successful: %s', self.successful)
 
     @utils.log_time
@@ -147,6 +159,7 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                 last_commit = monotonic()
                 for xml in section.iterator:
                     section.count += 1
+                    context.begin()
                     if not context.update_userdata(xml, section.plex_type):
                         # Somehow did not sync this item yet
                         self.add_missing_item(context, xml, section)
@@ -156,7 +169,8 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                     if (section.count % PLAYSTATE_BATCH_SIZE == 0 or
                             monotonic() - last_commit > COMMIT_INTERVAL):
                         # While we write, Kodi cannot
-                        context.commit()
+                        context.commit(begin=False)
+                        yield_to_kodi(self)
                         last_commit = monotonic()
         except RuntimeError:
             LOG.error('Could not entirely process section %s', section)
@@ -172,6 +186,8 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
         """
         plex_id = xml.get('ratingKey')
         LOG.info('Adding item missing in Kodi: %s %s', plex_id, xml.get('title'))
+        # Don't keep Kodi from writing while we ask the PMS
+        context.commit(begin=False)
         metadata = PF.GetPlexMetadata(plex_id)
         try:
             metadata[0].attrib
@@ -188,6 +204,7 @@ class FullSync(common.LibrarySyncMixin, bg.KillableThread):
                 LOG.error('Could not get the children of %s, adding it next '
                           'time', plex_id)
                 return
+        context.begin()
         context.add_update(metadata[0],
                            section_name=section.name,
                            section_id=section.section_id,
