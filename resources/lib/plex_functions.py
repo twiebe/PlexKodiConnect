@@ -12,7 +12,11 @@ from . import backgroundthread, utils, plex_tv, variables as v, app
 ###############################################################################
 LOG = getLogger('PLEX.plex_functions')
 
-CONTAINERSIZE = int(utils.settings('limitindex'))
+
+
+def container_size():
+    """How many items PKC asks the PMS for at once (setting limitindex)"""
+    return utils.cast(int, utils.settings('limitindex')) or 200
 
 # For discovery of PMS in the local LAN
 PLEX_GDM_IP = b'239.0.0.250'  # multicast to PMS
@@ -691,9 +695,10 @@ class DownloadGen(object):
         self.successful = True
         self.xml = None
         self.args = args
+        self.size = container_size()
         self.args.update({
             'X-Plex-Container-Start': 0,
-            'X-Plex-Container-Size': CONTAINERSIZE
+            'X-Plex-Container-Size': self.size
         })
         url += '?'
         if plex_type:
@@ -710,9 +715,9 @@ class DownloadGen(object):
         self.cache_factor = 10
         # Will keep track whether we still have results incoming
         self.pending_counter = []
-        end = min(self.cache_factor * CONTAINERSIZE,
-                  self.total + CONTAINERSIZE - self.total % CONTAINERSIZE)
-        for pos in range(CONTAINERSIZE, end, CONTAINERSIZE):
+        end = min(self.cache_factor * self.size,
+                  self.total + self.size - self.total % self.size)
+        for pos in range(self.size, end, self.size):
             self.pending_counter.append(None)
             self._downloader(self.url, self.args, pos, self.on_chunk_downloaded)
 
@@ -741,13 +746,13 @@ class DownloadGen(object):
                 child = self.xml[0]
                 self.current += 1
                 self.xml.remove(child)
-                if (self.current % CONTAINERSIZE == 0 and
-                        self.current <= self.total - (self.cache_factor - 1) * CONTAINERSIZE):
+                if (self.current % self.size == 0 and
+                        self.current <= self.total - (self.cache_factor - 1) * self.size):
                     self.pending_counter.append(None)
                     self._downloader(
                         self.url,
                         self.args,
-                        self.current + (self.cache_factor - 1) * CONTAINERSIZE,
+                        self.current + (self.cache_factor - 1) * self.size,
                         self.on_chunk_downloaded)
                 return child
             except IndexError:
@@ -823,15 +828,16 @@ def get_section_iterator(section_id, plex_type=None, last_viewed_at=None,
 
 def DownloadChunks(url):
     """
-    Downloads PMS url in chunks of CONTAINERSIZE.
+    Downloads PMS url in chunks of size.
     Returns a stitched-together xml or None.
     """
     xml = None
     pos = 0
+    size = container_size()
     error_counter = 0
     while error_counter < 10:
         args = {
-            'X-Plex-Container-Size': CONTAINERSIZE,
+            'X-Plex-Container-Size': size,
             'X-Plex-Container-Start': pos,
             'sort': 'id'
         }
@@ -842,25 +848,25 @@ def DownloadChunks(url):
         except AttributeError:
             LOG.error('Error while downloading chunks: %s, args: %s',
                       url, args)
-            pos += CONTAINERSIZE
+            pos += size
             error_counter += 1
             continue
 
         # Very first run: starting xml (to retain data in xml's root!)
         if xml is None:
             xml = deepcopy(xmlpart)
-            if len(xmlpart) < CONTAINERSIZE:
+            if len(xmlpart) < size:
                 break
             else:
-                pos += CONTAINERSIZE
+                pos += size
                 continue
         # Build answer xml - containing the entire library
         for child in xmlpart:
             xml.append(child)
         # Done as soon as we don't receive a full complement of items
-        if len(xmlpart) < CONTAINERSIZE:
+        if len(xmlpart) < size:
             break
-        pos += CONTAINERSIZE
+        pos += size
     if error_counter == 10:
         LOG.error('Fatal error while downloading chunks for %s', url)
         return None

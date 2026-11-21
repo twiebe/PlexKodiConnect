@@ -55,6 +55,10 @@ class KodiMonitor(xbmc.Monitor):
         Monitor the PKC settings for changes made by the user
         """
         LOG.debug('PKC settings change detected')
+        # Settings a running sync may see change at once; the others before
+        # the next sync
+        app.reload()
+        app.SYNC.settings_changed = True
         # the sync thread writes changed artwork sizes to the library
         art_sizes.reset()
 

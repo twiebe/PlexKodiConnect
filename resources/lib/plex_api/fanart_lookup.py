@@ -9,7 +9,6 @@ from .. import utils, variables as v
 
 LOG = getLogger('PLEX.api.fanartlookup')
 
-API_KEY = utils.settings('themoviedbAPIKey')
 
 # How far apart can a video's airing date be (in years)
 YEARS_APART = 1
@@ -29,7 +28,7 @@ def external_item_id(title, year, plex_type, collection):
     title = sub(r'\s*\(\d{4}\)$', '', title, count=1)
     url = 'https://api.themoviedb.org/3/search/%s' % media_type
     parameters = {
-        'api_key': API_KEY,
+        'api_key': utils.settings('themoviedbAPIKey'),
         'language': v.KODILANGUAGE,
         'query': title
     }
@@ -73,7 +72,7 @@ def external_item_id(title, year, plex_type, collection):
 
     # lookup external tmdb_id and perform artwork lookup on fanart.tv
     tmdb_id = entry.get('id')
-    parameters = {'api_key': API_KEY}
+    parameters = {'api_key': utils.settings('themoviedbAPIKey')}
     if media_type == 'movie':
         url = 'https://api.themoviedb.org/3/movie/%s' % tmdb_id
         parameters['append_to_response'] = 'videos'
