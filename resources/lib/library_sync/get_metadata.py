@@ -58,65 +58,81 @@ class GetMetadataThread(common.LibrarySyncMixin,
 
     def _process_abort(self, count, section):
         # Make sure other threads will also receive sentinel
-        self.get_metadata_queue.put(None)
+        common.queue_put(self, self.get_metadata_queue, None)
         if count is not None:
             self._process_skipped_item(count, section)
 
     def _process_skipped_item(self, count, section):
         section.sync_successful = False
         # Add a "dummy" item so we're not skipping a beat
-        self.processing_queue.put((count, {'section': section, 'xml': None}))
+        common.queue_put(self, self.processing_queue,
+                         (count, {'section': section, 'xml': None}))
 
     def _run(self):
         while True:
-            item = self.get_metadata_queue.get()
+            item = common.queue_get(self, self.get_metadata_queue)
+            if item is None:
+                # Sentinel or we need to stop
+                if not self.should_cancel():
+                    self._process_abort(None, None)
+                break
             try:
-                if item is None or self.should_cancel():
-                    self._process_abort(item[0] if item else None,
-                                        item[2] if item else None)
-                    break
-                count, plex_id, section = item
-                item = {
-                    'xml': PF.GetPlexMetadata(plex_id),  # This will block
-                    'children': None,
-                    'section': section
-                }
-                if item['xml'] is None:
-                    # Did not receive a valid XML - skip that item for now
-                    LOG.error("Could not get metadata for %s. Skipping item "
-                              "for now", plex_id)
-                    self._process_skipped_item(count, section)
+                if self.should_cancel():
+                    self._process_skipped_item(item[0], item[2])
                     continue
-                elif item['xml'] == 401:
-                    LOG.error('HTTP 401 returned by PMS. Too much strain? '
-                              'Cancelling sync for now')
-                    utils.window('plex_scancrashed', value='401')
-                    self._process_abort(count, section)
+                if not self._get_item(*item):
                     break
-                if section.plex_type == v.PLEX_TYPE_MOVIE:
-                    # Check for collections/sets
-                    collections = False
-                    for child in item['xml'][0]:
-                        if child.tag == 'Collection':
-                            collections = True
-                            break
-                    if collections:
-                        with LOCK:
-                            self._collections(item)
-                if section.get_children:
-                    if self.should_cancel():
-                        self._process_abort(count, section)
-                        break
-                    children_xml = PF.GetAllPlexChildren(plex_id)  # Will block
-                    try:
-                        children_xml[0].attrib
-                    except (TypeError, IndexError, AttributeError):
-                        LOG.error('Could not get children for Plex id %s',
-                                  plex_id)
-                        self._process_skipped_item(count, section)
-                        continue
-                    else:
-                        item['children'] = children_xml
-                self.processing_queue.put((count, item))
+            except Exception:
+                LOG.exception('Could not get the metadata of %s', item[1])
+                self._process_skipped_item(item[0], item[2])
             finally:
                 self.get_metadata_queue.task_done()
+
+    def _get_item(self, count, plex_id, section):
+        """
+        Downloads the metadata of plex_id and passes it on for processing.
+        Returns False if this thread should stop
+        """
+        item = {
+            'xml': PF.GetPlexMetadata(plex_id),  # This will block
+            'children': None,
+            'section': section
+        }
+        if item['xml'] is None:
+            # Did not receive a valid XML - skip that item for now
+            LOG.error("Could not get metadata for %s. Skipping item "
+                      "for now", plex_id)
+            self._process_skipped_item(count, section)
+            return True
+        elif item['xml'] == 401:
+            LOG.error('HTTP 401 returned by PMS. Too much strain? '
+                      'Cancelling sync for now')
+            utils.window('plex_scancrashed', value='401')
+            self._process_abort(count, section)
+            return False
+        if section.plex_type == v.PLEX_TYPE_MOVIE:
+            # Check for collections/sets
+            collections = False
+            for child in item['xml'][0]:
+                if child.tag == 'Collection':
+                    collections = True
+                    break
+            if collections:
+                with LOCK:
+                    self._collections(item)
+        if section.get_children:
+            if self.should_cancel():
+                self._process_skipped_item(count, section)
+                return True
+            children_xml = PF.GetAllPlexChildren(plex_id)  # Will block
+            try:
+                children_xml[0].attrib
+            except (TypeError, IndexError, AttributeError):
+                LOG.error('Could not get children for Plex id %s',
+                          plex_id)
+                self._process_skipped_item(count, section)
+                return True
+            else:
+                item['children'] = children_xml
+        common.queue_put(self, self.processing_queue, (count, item))
+        return True

@@ -261,7 +261,10 @@ class Sync(backgroundthread.KillableThread):
                             now - last_websocket_processing > 5 and
                             (utils.settings('delayBackgroundSyncWhilePlaying') == "false" or not app.APP.is_playing_video)):
                         last_websocket_processing = now
-                        library_sync.process_websocket_messages()
+                        try:
+                            library_sync.process_websocket_messages()
+                        except Exception:
+                            LOG.exception('Could not process the PMS messages')
                     # See if there is a PMS message we need to handle
                     try:
                         message = queue.get(block=False)
@@ -269,7 +272,11 @@ class Sync(backgroundthread.KillableThread):
                         pass
                     # Got a message from PMS; process it
                     else:
-                        library_sync.store_websocket_message(message)
+                        try:
+                            library_sync.store_websocket_message(message)
+                        except Exception:
+                            LOG.exception('Could not read PMS message %s',
+                                          message)
                         queue.task_done()
                         # Sleep just a bit
                         self.sleep(0.01)

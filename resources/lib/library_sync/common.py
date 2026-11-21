@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from logging import getLogger
+import queue
+
 import xbmc
 
 from .. import utils, app, variables as v
@@ -35,6 +37,37 @@ class LibrarySyncMixin(object):
         finally:
             app.APP.deregister_thread(self)
             LOG.debug('##===--- %s Stopped ---===##', self.__class__.__name__)
+
+
+# How long a sync thread waits on a queue before it checks whether to stop
+QUEUE_POLL = 0.5
+
+
+def queue_get(thread, source):
+    """
+    The next item of SOURCE, or None once THREAD should stop: a sync thread
+    must not wait for good on a thread that has died or stopped.
+    """
+    while not thread.should_cancel():
+        try:
+            return source.get(timeout=QUEUE_POLL)
+        except queue.Empty:
+            pass
+    return None
+
+
+def queue_put(thread, target, item):
+    """
+    Put ITEM in TARGET. Returns False if THREAD should stop before there is
+    room for it.
+    """
+    while not thread.should_cancel():
+        try:
+            target.put(item, timeout=QUEUE_POLL)
+            return True
+        except queue.Full:
+            pass
+    return False
 
 
 def update_kodi_library(video=True, music=True):
