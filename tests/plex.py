@@ -107,6 +107,11 @@ class FakePMS(object):
         # plex_id: exception to raise when its metadata is asked for
         self.metadata_errors = {}
         self.metadata_requests = []
+        # plex_ids of each request for several items at once
+        self.batch_requests = []
+        self.batch_fails = False
+        # plex_ids a batch answer leaves out
+        self.missing_in_batches = set()
         self.listing_requests = []
         # number of the listing request (1, 2, ...): what to do with it
         self.fail_listings = set()
@@ -116,6 +121,8 @@ class FakePMS(object):
     def install(self, monkeypatch):
         from resources.lib import plex_functions as PF
         monkeypatch.setattr(PF, 'GetPlexMetadata', self.get_metadata)
+        monkeypatch.setattr(PF, 'plex_metadata', self.plex_metadata,
+                            raising=False)
         monkeypatch.setattr(PF, 'get_section_iterator', self.section_iterator)
         monkeypatch.setattr(PF, 'collections', lambda section_id: container())
         monkeypatch.setattr(PF, 'plex_ids_on_pms', self.plex_ids_on_pms,
@@ -135,6 +142,14 @@ class FakePMS(object):
         if plex_id not in self.movies:
             return None
         return container(self.movies[plex_id])
+
+    def plex_metadata(self, plex_ids):
+        self.batch_requests.append(list(plex_ids))
+        if self.batch_fails:
+            return {}
+        return {x: container(self.movies[x]) for x in plex_ids
+                if x in self.movies and x not in self.metadata_errors and
+                x not in self.missing_in_batches}
 
     def section_iterator(self, section_id, plex_type=None, last_viewed_at=None,
                          updated_at=None, args=None):

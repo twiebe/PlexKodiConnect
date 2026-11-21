@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from logging import getLogger
+import queue
 
 from . import common
 from ..plex_api import API
@@ -7,6 +8,8 @@ from .. import backgroundthread, plex_functions as PF, utils, variables as v, ap
 
 LOG = getLogger('PLEX.sync.get_metadata')
 LOCK = backgroundthread.threading.Lock()
+# Items whose metadata one request asks for
+METADATA_BATCH_SIZE = 20
 
 
 class GetMetadataThread(common.LibrarySyncMixin,
@@ -18,6 +21,9 @@ class GetMetadataThread(common.LibrarySyncMixin,
     def __init__(self, get_metadata_queue, processing_queue):
         self.get_metadata_queue = get_metadata_queue
         self.processing_queue = processing_queue
+        # An item taken from the queue for the next batch
+        self._carry = None
+        self._carry_sentinel = False
         super(GetMetadataThread, self).__init__()
 
     def _collections(self, item):
@@ -70,33 +76,81 @@ class GetMetadataThread(common.LibrarySyncMixin,
         common.queue_put(self, self.processing_queue,
                          (count, {'section': section, 'xml': None}))
 
+    def _next_batch(self):
+        """
+        Up to METADATA_BATCH_SIZE items of one section, waiting only for the
+        first. Returns the list, empty for the sentinel or on cancel
+        """
+        item = self._carry or common.queue_get(self, self.get_metadata_queue)
+        self._carry = None
+        if item is None:
+            return []
+        batch = [item]
+        while len(batch) < METADATA_BATCH_SIZE:
+            try:
+                item = self.get_metadata_queue.get(block=False)
+            except queue.Empty:
+                break
+            if item is None or item[2] is not batch[0][2]:
+                # The sentinel or the next section: start the next batch
+                self._carry = item
+                self._carry_sentinel = item is None
+                break
+            batch.append(item)
+        return batch
+
     def _run(self):
         while True:
-            item = common.queue_get(self, self.get_metadata_queue)
-            if item is None:
+            if self._carry_sentinel:
+                batch = []
+            else:
+                batch = self._next_batch()
+            if not batch:
                 # Sentinel or we need to stop
                 if not self.should_cancel():
                     self._process_abort(None, None)
                 break
             try:
-                if self.should_cancel():
-                    self._process_skipped_item(item[0], item[2])
-                    continue
-                if not self._get_item(*item):
-                    break
-            except Exception:
-                LOG.exception('Could not get the metadata of %s', item[1])
-                self._process_skipped_item(item[0], item[2])
+                go_on = self._get_batch(batch)
             finally:
-                self.get_metadata_queue.task_done()
+                for _ in batch:
+                    self.get_metadata_queue.task_done()
+            if not go_on:
+                break
 
-    def _get_item(self, count, plex_id, section):
+    def _get_batch(self, batch):
         """
-        Downloads the metadata of plex_id and passes it on for processing.
+        Downloads the metadata of a batch with one request, then passes each
+        item on. Items the answer lacks are asked for one by one.
         Returns False if this thread should stop
         """
+        xmls = {}
+        if len(batch) > 1 and not self.should_cancel():
+            xmls = PF.plex_metadata([plex_id for _, plex_id, _ in batch])
+            if xmls == 401:
+                xmls = {}
+        for i, (count, plex_id, section) in enumerate(batch):
+            try:
+                if self.should_cancel():
+                    self._process_skipped_item(count, section)
+                    continue
+                if not self._get_item(count, plex_id, section,
+                                      xmls.get(plex_id)):
+                    for count, _, section in batch[i + 1:]:
+                        self._process_skipped_item(count, section)
+                    return False
+            except Exception:
+                LOG.exception('Could not get the metadata of %s', plex_id)
+                self._process_skipped_item(count, section)
+        return True
+
+    def _get_item(self, count, plex_id, section, xml=None):
+        """
+        Downloads the metadata of plex_id, unless XML has it, and passes it on
+        for processing. Returns False if this thread should stop
+        """
         item = {
-            'xml': PF.GetPlexMetadata(plex_id),  # This will block
+            'xml': xml if xml is not None else PF.GetPlexMetadata(plex_id),
             'children': None,
             'section': section
         }
