@@ -126,17 +126,26 @@ def process_websocket_messages():
 def download_new_items(messages):
     """
     The metadata of the new and changed items of MESSAGES, BATCH_SIZE at a
-    time: {plex_id: xml}. Items missing are asked for alone later
+    time, and alone for those a batch lacks: {plex_id: xml}. Before any DB
+    is locked: Kodi must not wait for the PMS. Items we could not get are
+    missing
     """
     plex_ids = [m['plex_id'] for m in messages]
     xmls = {}
-    if len(plex_ids) < 2:
-        return xmls
-    for start in range(0, len(plex_ids), BATCH_SIZE):
-        answer = PF.plex_metadata(plex_ids[start:start + BATCH_SIZE])
-        if answer == 401:
-            break
-        xmls.update(answer)
+    if len(plex_ids) > 1:
+        for start in range(0, len(plex_ids), BATCH_SIZE):
+            answer = PF.plex_metadata(plex_ids[start:start + BATCH_SIZE])
+            if answer == 401:
+                break
+            xmls.update(answer)
+    for plex_id in plex_ids:
+        if plex_id not in xmls:
+            xml = PF.GetPlexMetadata(plex_id)
+            try:
+                xml[0].attrib
+            except (IndexError, TypeError, AttributeError):
+                continue
+            xmls[plex_id] = xml
     return xmls
 
 
@@ -154,6 +163,12 @@ def process_messages(due, xmls, results):
     artwork_to_cache = []
     for plex_type in kinds:
         messages = [(i, m) for i, m in due if m['plex_type'] == plex_type]
+        if plex_type not in itemtypes.ITEMTYPE_FROM_PLEXTYPE:
+            # E.g. a playlist while playlists are not synced: nothing to do
+            LOG.debug('Ignoring messages of kind %s', plex_type)
+            for i, _ in messages:
+                results[i] = (True, False, False)
+            continue
         with itemtypes.ITEMTYPE_FROM_PLEXTYPE[plex_type](timing.unix_timestamp()) as typus:
             typus.commit(begin=False)
             for i, message in messages:
@@ -175,20 +190,21 @@ def process_messages(due, xmls, results):
                     continue
                 results[i] = result
                 if result[0] and message['state'] != 9:
-                    artwork_to_cache.append(message)
+                    artwork_to_cache.append((message['plex_id'], plex_type))
     for i, message in due:
         if i not in results and message['state'] != 9:
             # The PMS gave an item of another kind than the message said
+            xml = xmls.get(message['plex_id'])
             try:
-                results[i] = process_new_item_message(message, None,
-                                                      xmls.get(message['plex_id']))
+                results[i] = process_new_item_message(message, None, xml)
             except Exception:
                 LOG.exception('Could not process message %s', message)
                 continue
-            if results[i][0]:
-                artwork_to_cache.append(message)
-    for message in artwork_to_cache:
-        cache_artwork(message['plex_id'], message['plex_type'])
+            if results[i][0] and xml is not None:
+                artwork_to_cache.append((message['plex_id'],
+                                         xml[0].get('type')))
+    for plex_id, plex_type in artwork_to_cache:
+        cache_artwork(plex_id, plex_type)
 
 
 def process_new_item_message(message, typus=None, xml=None):
@@ -198,7 +214,8 @@ def process_new_item_message(message, typus=None, xml=None):
     music), or None if TYPUS is of another kind than the PMS says the item is
     """
     LOG.debug('Message: %s', message)
-    if xml is None:
+    if xml is None and typus is None:
+        # No DB is locked yet: we may ask the PMS
         xml = PF.GetPlexMetadata(message['plex_id'])
     try:
         plex_type = xml[0].attrib['type']

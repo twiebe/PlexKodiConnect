@@ -78,7 +78,8 @@ class Addon(object):
 
 class Monitor(object):
     def waitForAbort(self, timeout=None):
-        time.sleep(min(timeout or 0, 0.01))
+        # Long enough for the waits that let Kodi write, short for tests
+        time.sleep(min(timeout or 0, 0.2))
         return False
 
     def abortRequested(self):
@@ -188,6 +189,9 @@ def pkc(dbs):
 
 
 def pytest_sessionfinish(session, exitstatus):
+    # PKC's background workers are no daemons: without this pytest never ends
+    from resources.lib import backgroundthread
+    backgroundthread.BGThreader.shutdown(block=False)
     shutil.rmtree(KODI_HOME, ignore_errors=True)
 
 

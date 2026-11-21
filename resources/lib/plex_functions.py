@@ -546,7 +546,15 @@ def plex_metadata(plex_ids):
         plex_id = utils.cast(int, child.get('ratingKey'))
         if plex_id is None:
             continue
+        if child.get('librarySectionID') is None:
+            # The container names the section of the first item only: ask
+            # for this one alone
+            continue
         single = utils.undefused_etree.Element(xml.tag, xml.attrib)
+        for key in ('librarySectionID', 'librarySectionTitle',
+                    'librarySectionUUID'):
+            if child.get(key) is not None:
+                single.set(key, child.get(key))
         single.set('size', '1')
         single.append(child)
         result[plex_id] = single

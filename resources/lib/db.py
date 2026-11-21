@@ -24,8 +24,29 @@ class Connection(sqlite3.Connection):
     begin_sql = 'BEGIN'
 
     def begin(self):
-        if self.begin_sql:
-            self.execute(self.begin_sql)
+        """
+        Begin a transaction. Kodi may hold the write lock for longer than the
+        busy timeout, e.g. while it cleans its library: retry
+        """
+        if not self.begin_sql:
+            return
+        attempts = DB_WRITE_ATTEMPTS
+        timeout = DB_WRITE_ATTEMPTS_TIMEOUT
+        while True:
+            try:
+                self.execute(self.begin_sql)
+                return
+            except sqlite3.OperationalError as err:
+                if 'database is locked' not in str(err):
+                    raise
+                attempts -= 1
+                if attempts == 0:
+                    raise LockedDatabase('Database is locked')
+                logger.debug('DB locked, retrying BEGIN in %.2fs', timeout)
+                if app.APP.monitor.waitForAbort(timeout):
+                    raise LockedDatabase('Database was locked and we need '
+                                         'to exit')
+                timeout = min(timeout * 2, DB_WRITE_ATTEMPTS_TIMEOUT_MAX)
 
     def restart(self):
         """Commit and begin the next transaction"""
@@ -54,14 +75,28 @@ def catch_operationalerrors(method):
         attempts = DB_WRITE_ATTEMPTS
         timeout = DB_WRITE_ATTEMPTS_TIMEOUT
         while True:
+            # Holding the write lock, only the texture DB can be locked: undo
+            # what the method wrote so far and try it again, keeping the
+            # transaction
+            savepoint = _holds_write_lock(self.kodiconn)
+            if savepoint:
+                self.kodiconn.execute('SAVEPOINT pkc_retry')
             try:
-                return method(self, *args, **kwargs)
+                result = method(self, *args, **kwargs)
             except Exception as err:
+                if savepoint:
+                    _undo_savepoint(self.kodiconn)
                 if 'database is locked' not in str(err):
                     raise
-                if _holds_write_lock(self.kodiconn):
-                    raise LockedDatabase('Database is locked')
                 attempts -= 1
+                if savepoint:
+                    if attempts == 0:
+                        raise LockedDatabase('Database is locked')
+                    if app.APP.monitor.waitForAbort(timeout):
+                        raise LockedDatabase('Database was locked and we '
+                                             'need to exit')
+                    timeout = min(timeout * 2, DB_WRITE_ATTEMPTS_TIMEOUT_MAX)
+                    continue
                 logger.debug('DB locked, retrying in %.2fs (%d left)',
                              timeout, attempts)
                 if attempts == 0:
@@ -77,12 +112,25 @@ def catch_operationalerrors(method):
                 _begin_transaction(self.kodiconn)
                 if self.artconn:
                     _begin_transaction(self.artconn)
+            else:
+                if savepoint:
+                    self.kodiconn.execute('RELEASE pkc_retry')
+                return result
     return wrapper
 
 
 def _holds_write_lock(conn):
     return (getattr(conn, 'begin_sql', None) == 'BEGIN IMMEDIATE' and
             conn.in_transaction)
+
+
+def _undo_savepoint(conn):
+    try:
+        conn.execute('ROLLBACK TO pkc_retry')
+        conn.execute('RELEASE pkc_retry')
+    except sqlite3.Error:
+        # SQLite already rolled back the whole transaction
+        pass
 
 
 def _close_transaction(conn):

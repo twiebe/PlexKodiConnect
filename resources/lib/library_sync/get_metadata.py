@@ -18,8 +18,10 @@ class GetMetadataThread(common.LibrarySyncMixin,
     Threaded download of Plex XML metadata for a certain library item.
     Fills the queue with the downloaded etree XML objects
     """
-    def __init__(self, get_metadata_queue, processing_queue):
+    def __init__(self, get_metadata_queue, processing_queue, on_abort=None):
         self.get_metadata_queue = get_metadata_queue
+        # Called if the whole sync must stop
+        self.on_abort = on_abort
         self.processing_queue = processing_queue
         # An item taken from the queue for the next batch
         self._carry = None
@@ -164,6 +166,9 @@ class GetMetadataThread(common.LibrarySyncMixin,
             LOG.error('HTTP 401 returned by PMS. Too much strain? '
                       'Cancelling sync for now')
             utils.window('plex_scancrashed', value='401')
+            # Cancel first: a full queue would block the sentinel
+            if self.on_abort:
+                self.on_abort()
             self._process_abort(count, section)
             return False
         if section.plex_type == v.PLEX_TYPE_MOVIE:

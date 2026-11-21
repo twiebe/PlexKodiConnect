@@ -51,11 +51,42 @@ def test_a_reader_retries_when_locked(pkc, dbs):
     assert writer.locked_once() == 'done'
 
 
-def test_a_writer_holding_the_lock_does_not_commit_half_its_work(pkc, dbs):
+class HalfWriter(Writer):
+    @db.catch_operationalerrors
+    def write_then_locked_once(self):
+        # Writes the Kodi DB, then the texture DB is locked
+        self.calls += 1
+        self.kodiconn.execute("INSERT INTO sets(strSet) VALUES ('try %s')"
+                              % self.calls)
+        if self.calls == 1:
+            raise sqlite3.OperationalError('database is locked')
+        return 'done'
+
+
+def test_a_writer_holding_the_lock_retries_without_committing(pkc, dbs):
+    conn = db.connect('video', write=True)
+    conn.execute("INSERT INTO sets(strSet) VALUES ('before')")
+    assert HalfWriter(conn).write_then_locked_once() == 'done'
+    # Nothing committed, the transaction goes on
+    assert video_rows(dbs) == []
+    assert conn.in_transaction
+    conn.commit()
+    # The failed try is undone, what came before is kept
+    assert sorted(video_rows(dbs)) == [('before', ), ('try 2', )]
+
+
+def test_a_writer_holding_the_lock_gives_up_in_the_end(pkc, dbs, monkeypatch):
+    monkeypatch.setattr(db, 'DB_WRITE_ATTEMPTS', 2)
+    monkeypatch.setattr(db, 'DB_WRITE_ATTEMPTS_TIMEOUT', 0.01)
+
+    class Always(Writer):
+        @db.catch_operationalerrors
+        def locked(self):
+            raise sqlite3.OperationalError('database is locked')
     conn = db.connect('video', write=True)
     conn.execute("INSERT INTO sets(strSet) VALUES ('half')")
     with pytest.raises(exceptions.LockedDatabase):
-        Writer(conn).locked_once()
+        Always(conn).locked()
     assert video_rows(dbs) == []
 
 
