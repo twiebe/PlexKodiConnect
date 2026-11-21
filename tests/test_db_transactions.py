@@ -104,3 +104,15 @@ def test_kodi_can_write_while_the_sync_waits_for_downloads(pkc, dbs, monkeypatch
     runner.join(20)
     assert result['sync'].successful
     assert reader.execute('SELECT COUNT(*) FROM movie').fetchone()[0] == 5
+
+
+def test_a_new_kodi_id_needs_the_write_lock(pkc, dbs):
+    from resources.lib.kodi_db import KodiVideoDB
+    reader = db.connect('video')
+    with pytest.raises(RuntimeError):
+        KodiVideoDB(kodiconn=reader, lock=False).new_movie_id()
+    writer = db.connect('video', write=True)
+    assert KodiVideoDB(kodiconn=writer, lock=False).new_movie_id() == 1
+    writer.commit()
+    with pytest.raises(RuntimeError):
+        KodiVideoDB(kodiconn=writer, lock=False).new_movie_id()

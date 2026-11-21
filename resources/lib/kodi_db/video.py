@@ -921,12 +921,10 @@ class KodiVideoDB(common.KodiDBBase):
                             (kodi_id, kodi_type))
 
     def new_show_id(self):
-        self.cursor.execute('SELECT COALESCE(MAX(idShow), 0) FROM tvshow')
-        return self.cursor.fetchone()[0] + 1
+        return self.new_id('tvshow', 'idShow')
 
     def new_episode_id(self):
-        self.cursor.execute('SELECT COALESCE(MAX(idEpisode), 0) FROM episode')
-        return self.cursor.fetchone()[0] + 1
+        return self.new_id('episode', 'idEpisode')
 
     @db.catch_operationalerrors
     def add_episode(self, *args):
@@ -1040,8 +1038,7 @@ class KodiVideoDB(common.KodiDBBase):
                             (kodi_id,))
 
     def new_movie_id(self):
-        self.cursor.execute('SELECT COALESCE(MAX(idMovie), 0) FROM movie')
-        return self.cursor.fetchone()[0] + 1
+        return self.new_id('movie', 'idMovie')
 
     @db.catch_operationalerrors
     def add_movie(self, *args):

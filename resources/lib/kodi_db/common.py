@@ -26,6 +26,20 @@ class KodiDBBase(object):
         self.artcursor = self.artconn.cursor() if self.artconn else None
         self._has_video_version_table = None
 
+    def new_id(self, table, column):
+        """
+        The id for a new row of TABLE, as SQLite would give it. Only inside a
+        transaction that holds the write lock: else Kodi could take the same
+        id between this and the INSERT
+        """
+        if not (self.kodiconn.in_transaction and
+                getattr(self.kodiconn, 'begin_sql', None) == 'BEGIN IMMEDIATE'):
+            raise RuntimeError('New %s id outside of a write transaction'
+                               % table)
+        self.cursor.execute('SELECT COALESCE(MAX(%s), 0) FROM %s'
+                            % (column, table))
+        return self.cursor.fetchone()[0] + 1
+
     def __enter__(self):
         if self.lock:
             KODIDB_LOCK.acquire()

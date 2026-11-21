@@ -155,8 +155,7 @@ class KodiMusicDB(common.KodiDBBase):
                     self.delete_genre(genre[0])
 
     def new_album_id(self):
-        self.cursor.execute('SELECT COALESCE(MAX(idAlbum), 0) FROM album')
-        return self.cursor.fetchone()[0] + 1
+        return self.new_id('album', 'idAlbum')
 
     @db.catch_operationalerrors
     def add_album(self, *args):
@@ -302,8 +301,7 @@ class KodiMusicDB(common.KodiDBBase):
                 ''', (genreid, kodiid, 0))
 
     def add_song_id(self):
-        self.cursor.execute('SELECT COALESCE(MAX(idSong),0) FROM song')
-        return self.cursor.fetchone()[0] + 1
+        return self.new_id('song', 'idSong')
 
     @db.catch_operationalerrors
     def add_song(self, *args):
