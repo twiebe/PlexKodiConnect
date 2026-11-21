@@ -18,6 +18,19 @@ LOG = getLogger('PLEX.sync.websocket')
 WEBSOCKET_MESSAGES = []
 # New items whose metadata one request asks for
 BATCH_SIZE = 20
+# Parents before their children: an episode needs its show and season in the
+# DBs, a track its artist and album
+KIND_ORDER = (v.PLEX_TYPE_SHOW, v.PLEX_TYPE_SEASON, v.PLEX_TYPE_EPISODE,
+              v.PLEX_TYPE_ARTIST, v.PLEX_TYPE_ALBUM, v.PLEX_TYPE_SONG)
+# The attributes naming an item's parents, by kind
+PARENTS = {
+    v.PLEX_TYPE_SEASON: (('parentRatingKey', v.PLEX_TYPE_SHOW), ),
+    v.PLEX_TYPE_EPISODE: (('grandparentRatingKey', v.PLEX_TYPE_SHOW),
+                          ('parentRatingKey', v.PLEX_TYPE_SEASON)),
+    v.PLEX_TYPE_ALBUM: (('parentRatingKey', v.PLEX_TYPE_ARTIST), ),
+    v.PLEX_TYPE_SONG: (('grandparentRatingKey', v.PLEX_TYPE_ARTIST),
+                       ('parentRatingKey', v.PLEX_TYPE_ALBUM)),
+}
 # Dict to save info for Plex items currently being played somewhere
 PLAYSTATE_SESSIONS = {}
 
@@ -83,14 +96,18 @@ def process_websocket_messages():
             # item. Do it later (excepting deletions)
             continue
         due.append((i, message))
+    parents, children = {}, {}
     try:
         xmls = download_new_items([m for _, m in due if m['state'] != 9])
+        parents = download_parents(xmls)
+        children = download_children(list(xmls.values()) +
+                                     list(parents.values()))
     except Exception:
         LOG.exception('Could not download the new items')
         xmls = {}
     results = {}
     try:
-        process_messages(due, xmls, results)
+        process_messages(due, xmls, results, parents, children)
     except Exception:
         # E.g. a locked DB: the messages without a result are tried again
         LOG.exception('Could not process the websocket messages')
@@ -130,7 +147,11 @@ def download_new_items(messages):
     is locked: Kodi must not wait for the PMS. Items we could not get are
     missing
     """
-    plex_ids = [m['plex_id'] for m in messages]
+    return download([m['plex_id'] for m in messages])
+
+
+def download(plex_ids):
+    """{plex_id: xml} of the items PLEX_IDS the PMS gave us"""
     xmls = {}
     if len(plex_ids) > 1:
         for start in range(0, len(plex_ids), BATCH_SIZE):
@@ -149,17 +170,23 @@ def download_new_items(messages):
     return xmls
 
 
-def process_messages(due, xmls, results):
+def process_messages(due, xmls, results, parents=None, children=None):
     """
     Writes the items of the messages DUE [(index, message)] to the DBs, one
     DB context for all messages of a kind, and puts
     (successful, video, music) into RESULTS by index. A failed item is rolled
-    back on its own
+    back on its own. PARENTS {plex_id: xml}: the shows, seasons, artists and
+    albums the items need, added first. CHILDREN {plex_id: xml}: the tracks
+    of the albums
     """
+    parents = parents or {}
+    children = children or {}
     kinds = []
-    for _, message in due:
-        if message['plex_type'] not in kinds:
-            kinds.append(message['plex_type'])
+    for plex_type in [m['plex_type'] for _, m in due] + \
+            [x[0].get('type') for x in parents.values()]:
+        if plex_type not in kinds:
+            kinds.append(plex_type)
+    kinds.sort(key=lambda x: KIND_ORDER.index(x) if x in KIND_ORDER else -1)
     artwork_to_cache = []
     for plex_type in kinds:
         messages = [(i, m) for i, m in due if m['plex_type'] == plex_type]
@@ -171,6 +198,17 @@ def process_messages(due, xmls, results):
             continue
         with itemtypes.ITEMTYPE_FROM_PLEXTYPE[plex_type](timing.unix_timestamp()) as typus:
             typus.commit(begin=False)
+            for plex_id, xml in parents.items():
+                if xml[0].get('type') != plex_type:
+                    continue
+                typus.begin()
+                try:
+                    add_update(typus, xml, children.get(plex_id))
+                    typus.commit(begin=False)
+                except Exception:
+                    # Its children will try again
+                    LOG.exception('Could not add the parent %s', plex_id)
+                    typus.rollback()
             for i, message in messages:
                 typus.begin()
                 try:
@@ -178,7 +216,8 @@ def process_messages(due, xmls, results):
                         result = process_delete_message(message, typus)
                     else:
                         result = process_new_item_message(
-                            message, typus, xmls.get(message['plex_id']))
+                            message, typus, xmls.get(message['plex_id']),
+                            children.get(message['plex_id']))
                     typus.commit(begin=False)
                 except Exception:
                     # One item the PMS told us about must not stop the sync
@@ -207,7 +246,37 @@ def process_messages(due, xmls, results):
         cache_artwork(plex_id, plex_type)
 
 
-def process_new_item_message(message, typus=None, xml=None):
+def download_parents(xmls):
+    """
+    {plex_id: xml} of the shows, seasons, artists and albums the items of
+    XMLS need, but neither the DBs nor XMLS have. Otherwise the items would
+    ask the PMS for them with Kodi's DB locked
+    """
+    missing = set()
+    with PlexDB(lock=False) as plexdb:
+        for xml in xmls.values():
+            for attribute, plex_type in PARENTS.get(xml[0].get('type'), ()):
+                plex_id = utils.cast(int, xml[0].get(attribute))
+                if (plex_id is not None and plex_id not in xmls and
+                        not getattr(plexdb, plex_type)(plex_id)):
+                    missing.add(plex_id)
+    return download(sorted(missing)) if missing else {}
+
+
+def download_children(xmls):
+    """{plex_id: xml} of the tracks of the albums among XMLS"""
+    children = {}
+    for xml in xmls:
+        if xml[0].get('type') != v.PLEX_TYPE_ALBUM:
+            continue
+        plex_id = int(xml[0].get('ratingKey'))
+        tracks = PF.GetAllPlexChildren(plex_id)
+        if tracks is not None and tracks is not False:
+            children[plex_id] = tracks
+    return children
+
+
+def process_new_item_message(message, typus=None, xml=None, children=None):
     """
     Adds or updates the item of MESSAGE with TYPUS, an open DB context for
     its kind, or with a context of its own. Returns (successful, video,
@@ -227,16 +296,17 @@ def process_new_item_message(message, typus=None, xml=None):
     LOG.debug("Processing new/updated PMS item: %s", message['plex_id'])
     if typus is None:
         with itemtypes.ITEMTYPE_FROM_PLEXTYPE[plex_type](timing.unix_timestamp()) as typus:
-            add_update(typus, xml)
+            add_update(typus, xml, children)
     else:
-        add_update(typus, xml)
+        add_update(typus, xml, children)
     return True, plex_type in v.PLEX_VIDEOTYPES, plex_type in v.PLEX_AUDIOTYPES
 
 
-def add_update(typus, xml):
+def add_update(typus, xml, children=None):
     typus.add_update(xml[0],
                      section_name=xml.get('librarySectionTitle'),
-                     section_id=utils.cast(int, xml.get('librarySectionID')))
+                     section_id=utils.cast(int, xml.get('librarySectionID')),
+                     children=children)
 
 
 def process_delete_message(message, typus):
