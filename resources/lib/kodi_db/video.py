@@ -308,6 +308,29 @@ class KodiVideoDB(common.KodiDBBase):
                                     'studio',
                                     'studio_id')
 
+    def filename(self, kodi_id, kodi_type):
+        """
+        The file name of the movie or episode, '' if it has no file, None if
+        Kodi has no such item
+        """
+        table, column = {v.KODI_TYPE_MOVIE: ('movie', 'idMovie'),
+                         v.KODI_TYPE_EPISODE: ('episode', 'idEpisode')}[kodi_type]
+        self.cursor.execute('''
+            SELECT files.strFilename FROM %s
+            LEFT JOIN files ON files.idFile = %s.idFile
+            WHERE %s = ?
+        ''' % (table, table, column), (kodi_id, ))
+        row = self.cursor.fetchone()
+        return None if row is None else (row[0] or '')
+
+    def tags(self, kodi_id, kodi_type):
+        self.cursor.execute('''
+            SELECT tag.name FROM tag_link
+            JOIN tag ON tag.tag_id = tag_link.tag_id
+            WHERE tag_link.media_id = ? AND tag_link.media_type = ?
+        ''', (kodi_id, kodi_type))
+        return [row[0] for row in self.cursor.fetchall()]
+
     def modify_tags(self, kodi_id, kodi_type, tags=None):
         """
         Writes a country (string) in the list countries into the Kodi DB. Will

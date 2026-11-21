@@ -9,7 +9,8 @@ UPDATED_AT = 1700000000
 
 
 def movie(plex_id, title=None, updated_at=UPDATED_AT, view_count=0,
-          view_offset=0, user_rating=None, collections=()):
+          view_offset=0, user_rating=None, collections=(), labels=(),
+          filename=None):
     """A movie as the PMS describes it in /library/metadata/<plex_id>."""
     attrib = {
         'ratingKey': str(plex_id),
@@ -42,8 +43,8 @@ def movie(plex_id, title=None, updated_at=UPDATED_AT, view_count=0,
         'height': '1080', 'container': 'mkv'})
     part = ET.SubElement(media, 'Part', {
         'id': str(plex_id), 'key': '/library/parts/%s/file.mkv' % plex_id,
-        'file': '/media/movies/Movie %s (2001)/Movie %s (2001).mkv'
-                % (plex_id, plex_id),
+        'file': '/media/movies/Movie %s (2001)/%s'
+                % (plex_id, filename or 'Movie %s (2001).mkv' % plex_id),
         'duration': '5400000', 'container': 'mkv'})
     ET.SubElement(part, 'Stream', {'streamType': '1', 'codec': 'h264',
                                    'width': '1920', 'height': '1080'})
@@ -56,6 +57,8 @@ def movie(plex_id, title=None, updated_at=UPDATED_AT, view_count=0,
                                   'thumb': ''})
     for index, name in collections:
         ET.SubElement(video, 'Collection', {'id': str(index), 'tag': name})
+    for name in labels:
+        ET.SubElement(video, 'Label', {'tag': name})
     return video
 
 
@@ -94,7 +97,7 @@ def _media(element, plex_id, path, duration, video=True):
                                    'languageCode': 'eng'})
 
 
-def show(plex_id, title=None, updated_at=UPDATED_AT):
+def show(plex_id, title=None, updated_at=UPDATED_AT, labels=()):
     """A show as the kodi-dev Plex describes it"""
     title = title or 'Show %s' % plex_id
     xml = _item('Directory', SHOW_SECTION_ID, 'TV Shows',
@@ -102,6 +105,8 @@ def show(plex_id, title=None, updated_at=UPDATED_AT):
                 type='show', title=title, index=1, updatedAt=updated_at,
                 thumb='/library/metadata/%s/thumb/%s' % (plex_id, updated_at))
     ET.SubElement(xml, 'Location', {'path': '/media/shows/%s' % title})
+    for name in labels:
+        ET.SubElement(xml, 'Label', {'tag': name})
     return xml
 
 
@@ -200,6 +205,11 @@ def listing(*movies):
     items = []
     for item in movies:
         short = ET.Element(item.tag, item.attrib)
+        # Its files, without streams
+        for media in item.findall('Media'):
+            short_media = ET.SubElement(short, 'Media', media.attrib)
+            for part in media.findall('Part'):
+                ET.SubElement(short_media, 'Part', part.attrib)
         items.append(short)
     return items
 
@@ -240,6 +250,8 @@ class FakePMS(object):
         self.missing_in_batches = set()
         self.listing_requests = []
         self.children_requests = []
+        self.tag_requests = []
+        self.tags_fail = False
         # number of the listing request (1, 2, ...): what to do with it
         self.fail_listings = set()
         self.hide_in_listings = {}
@@ -252,6 +264,8 @@ class FakePMS(object):
                             raising=False)
         monkeypatch.setattr(PF, 'get_section_iterator', self.section_iterator)
         monkeypatch.setattr(PF, 'GetAllPlexChildren', self.children)
+        monkeypatch.setattr(PF, 'tag_members', self.tag_members,
+                            raising=False)
         monkeypatch.setattr(PF, 'collections', lambda section_id: container())
         monkeypatch.setattr(PF, 'plex_ids_on_pms', self.plex_ids_on_pms,
                             raising=False)
@@ -270,6 +284,19 @@ class FakePMS(object):
         if plex_id not in self.movies:
             return None
         return container(self.movies[plex_id])
+
+    def tag_members(self, section_id, plex_type):
+        """The collections and labels of the items, as the PMS lists them"""
+        self.tag_requests.append(section_id)
+        if self.tags_fail:
+            return None
+        members = {}
+        for plex_id, item in self.movies.items():
+            names = {x.get('tag') for x in item
+                     if x.tag in ('Collection', 'Label')}
+            if names and item.get('librarySectionID') == str(section_id):
+                members[plex_id] = names
+        return members
 
     def children(self, key):
         self.children_requests.append(int(key))

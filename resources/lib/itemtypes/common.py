@@ -5,7 +5,7 @@ from ntpath import dirname
 
 from ..plex_db import PlexDB, PLEXDB_LOCK
 from ..kodi_db import KodiVideoDB, KODIDB_LOCK
-from .. import db, timing, app
+from .. import db, timing, app, variables as v
 
 LOG = getLogger('PLEX.itemtypes.common')
 
@@ -27,6 +27,19 @@ def process_path(playurl):
         path = '%s/' % playurl
         toplevelpath = '%s/' % dirname(dirname(path))
     return path, toplevelpath
+
+
+def renamed(xml, filename):
+    """
+    True if the first file of XML, an item of a section listing, is not
+    FILENAME, the name of its file in Kodi
+    """
+    part = xml.find('Media/Part')
+    if (part is None or not part.get('file') or not filename or
+            '://' in filename):
+        # Nothing to compare, a stack:// of several files or add-on paths
+        return False
+    return part.get('file').replace('\\', '/').rsplit('/', 1)[-1] != filename
 
 
 class ItemBase(object):
@@ -169,6 +182,38 @@ class ItemBase(object):
                                    duration,
                                    view_count,
                                    timing.plex_date_to_kodi(lastViewedAt))
+
+    def outdated(self, xml, section):
+        """
+        True if Kodi's movie, show or episode for XML, an item of a pass over
+        all items of SECTION, needs the PMS's metadata again although the PMS
+        did not mark the item as updated: Kodi lost it, its file has another
+        name (direct paths), or its collections or labels changed. Forgets an
+        item Kodi lost, so that it is added anew
+        """
+        kodi_type = v.KODITYPE_FROM_PLEXTYPE.get(section.plex_type)
+        if kodi_type not in (v.KODI_TYPE_MOVIE, v.KODI_TYPE_SHOW,
+                             v.KODI_TYPE_EPISODE):
+            return False
+        plex_id = int(xml.get('ratingKey'))
+        db_item = self.plexdb.item_by_id(plex_id, section.plex_type)
+        if not db_item:
+            return False
+        if kodi_type != v.KODI_TYPE_SHOW:
+            filename = self.kodidb.filename(db_item['kodi_id'], kodi_type)
+            if filename is None:
+                LOG.info('Kodi lost %s %s, adding it again', kodi_type, plex_id)
+                self.plexdb.remove(plex_id, section.plex_type)
+                return True
+            if app.SYNC.direct_paths and renamed(xml, filename):
+                return True
+        if section.tags is not None and kodi_type != v.KODI_TYPE_EPISODE:
+            names = {section.name} | section.tags.get(plex_id, set())
+            if ({x.casefold() for x in names if x} !=
+                    {x.casefold() for x in
+                     self.kodidb.tags(db_item['kodi_id'], kodi_type)}):
+                return True
+        return False
 
     @staticmethod
     def sync_this_item(section_id):
